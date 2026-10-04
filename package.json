@@ -1,0 +1,14 @@
+{
+  "name": "agentic-jev",
+  "version": "0.1.0",
+  "description": "Typed yes/no, pick-one and score decisions for coding agents, from any shell, plus a should-I-compact hook.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "bin": { "jev": "bin/jev" },
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "test": "node --test \"tests/*.test.ts\"",
+    "test:live": "JEV_LIVE=1 node --test tests/cli.test.ts"
+  }
+}

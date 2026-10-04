@@ -1,0 +1,22 @@
+#!/bin/sh
+# jev: typed decisions for coding agents. Needs Node >= 22.18. Run `jev --help`.
+self=$0
+while [ -L "$self" ]; do
+  link=$(readlink "$self")
+  case $link in /*) self=$link ;; *) self=$(dirname "$self")/$link ;; esac
+done
+root=$(cd "$(dirname "$self")/.." && pwd)
+config=${JEV_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/jev/env}
+
+if [ "$1" = setup ]; then
+  printf 'Jev API key (TypeSafe apikey_... or OpenRouter sk-or-...): '
+  stty -echo 2>/dev/null; read -r key; stty echo 2>/dev/null; echo
+  [ -n "$key" ] || { echo "jev setup: no key entered" >&2; exit 1; }
+  case $key in sk-or-*) var=OPENROUTER_API_KEY ;; *) var=TYPESAFE_API_KEY ;; esac
+  mkdir -p "$(dirname "$config")" && (umask 077 && printf '%s=%s\n' "$var" "$key" > "$config")
+  echo "jev setup: saved $var to $config"
+  exit 0
+fi
+
+[ -f "$config" ] && exec node --env-file="$config" "$root/src/cli.ts" "$@"
+exec node "$root/src/cli.ts" "$@"
