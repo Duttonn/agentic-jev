@@ -1,0 +1,12 @@
+{
+  "name": "agentic-jev",
+  "description": "Jev typed decisions for agentic coding environments.",
+  "owner": { "name": "Duttonn" },
+  "plugins": [
+    {
+      "name": "jev",
+      "source": "./",
+      "description": "Typed decisions for coding agents through the jev CLI, and a should-I-compact Stop hook."
+    }
+  ]
+}

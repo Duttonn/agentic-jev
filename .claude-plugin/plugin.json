@@ -1,0 +1,9 @@
+{
+  "name": "jev",
+  "version": "0.1.0",
+  "description": "Typed yes/no, pick-one and score decisions about files, command output or text in about 300 ms, as a skill and a CLI on the Bash PATH, plus a Stop hook that says when to compact and where to cut.",
+  "author": { "name": "Duttonn" },
+  "repository": "https://github.com/Duttonn/agentic-jev",
+  "license": "MIT",
+  "keywords": ["jev", "decisions", "compaction", "skills"]
+}
