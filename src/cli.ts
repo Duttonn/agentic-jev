@@ -5,6 +5,7 @@
  *   jev files   -q QUESTIONS [-r] [--cwd DIR] PATH_OR_GLOB...                    the same questions of many files
  *   jev compact --transcript FILE | --hook claude-code                          should this session compact now?
  *   jev setup                                                                    store the API key (handled by bin/jev)
+ *   jev install                                                                  install from a clone or npx (handled by bin/jev)
  *
  * Answers print as JSON. Every Jev call appends question ids, answers and usage (never the state) to
  * $JEV_STATE_DIR/ledger.jsonl, default ~/.local/state/jev.
@@ -29,6 +30,7 @@ const USAGE = `jev ask     -q QUESTIONS [-s STATE] [-p PATH]... [-c COMMAND] [--
 jev files   -q QUESTIONS [-r] [--cwd DIR] PATH_OR_GLOB...
 jev compact --transcript FILE | --hook claude-code
 jev setup
+jev install
 QUESTIONS: JSON, or - to read it from stdin.
 
 ask: ${ASK_JEV_DESCRIPTION.replace("For many files judged separately use ask_jev_files instead.", "For many files judged separately use `jev files`.")}
@@ -39,7 +41,10 @@ files: the same questions of many files, one call per file in parallel. Globs an
 compact: reads a Claude Code transcript and says whether to compact now, with a ready /compact line. --hook claude-code reads
 a Stop hook payload on stdin and prints a systemMessage only when compacting is worth it.
 
-setup: prompts for a TypeSafe (apikey_...) or OpenRouter (sk-or-...) key and stores it in ~/.config/jev/env, mode 600.`;
+setup: prompts for a TypeSafe (apikey_...) or OpenRouter (sk-or-...) key and stores it in ~/.config/jev/env, mode 600.
+
+install: copies jev to ~/.local/share/jev, links it into ~/.local/bin and its skill into ~/.agents/skills, and runs
+setup when no key is set. Works from a clone (bin/jev install) or from npx (npx github:Duttonn/agentic-jev install).`;
 
 const { values: o, positionals } = parseArgs({
   allowPositionals: true,

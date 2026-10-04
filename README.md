@@ -23,17 +23,18 @@ and its levels 7 to 10 are vendored unchanged under `src/core` and `src/levels`,
 Needs Node 22.18 or later, and a Jev key: TypeSafe (`apikey_...`) or OpenRouter (`sk-or-...`).
 
 ```sh
-git clone git@github.com:Duttonn/agentic-jev.git && cd agentic-jev
-./install.sh
+npx -y github:Duttonn/agentic-jev install
 ```
 
-`install.sh` does three things:
+Or from a clone: `bin/jev install`. Either way, the install does four things:
+- copies jev to `~/.local/share/jev`;
 - links `jev` into `~/.local/bin`;
-- asks for the key and stores it in `~/.config/jev/env`, mode 600;
-- links the skill into `~/.agents/skills/jev`, where Codex and other agents look for user skills.
+- links the skill into `~/.agents/skills/jev`, where Codex and other agents look for user skills;
+- asks for the key if none is set, and stores it in `~/.config/jev/env`, mode 600.
 
-You can run `jev setup` again at any time to replace the key. A key already exported as
-`TYPESAFE_API_KEY` or `OPENROUTER_API_KEY` takes precedence over the file.
+Run the same command again to update. `jev setup` replaces the key at any time. A key already exported
+as `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY` takes precedence over the file. `JEV_HOME`, `JEV_BIN_DIR`
+and `JEV_SKILLS_DIR` move the three install locations.
 
 ### Claude Code
 
@@ -42,17 +43,17 @@ claude plugin marketplace add Duttonn/agentic-jev
 claude plugin install jev@agentic-jev
 ```
 
-This installs the skill, `jev` on the Bash tool's PATH, and the compaction hook. Run `./install.sh` or
-`bin/jev setup` once from a terminal for the key.
+This installs the skill, `jev` on the Bash tool's PATH, and the compaction hook. For the key, run the npx
+install above once from a terminal.
 
 ### Codex
 
-`install.sh` already links the skill into `~/.agents/skills`. Codex needs network access for `jev`, so
+The install already links the skill into `~/.agents/skills`. Codex needs network access for `jev`, so
 approve the escalation if its sandbox blocks the call.
 
 ### Any other agent
 
-Put `jev` on PATH (`install.sh`), then paste `AGENTS.snippet.md` into the file the agent reads:
+After the install, paste `~/.local/share/jev/AGENTS.snippet.md` into the file the agent reads:
 `AGENTS.md`, `CLAUDE.md`, `.cursor/rules/*.mdc`, or the equivalent.
 
 ## Use

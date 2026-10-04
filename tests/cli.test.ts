@@ -94,6 +94,19 @@ test("setup stores the key with mode 600 and picks the provider from its prefix"
   assert.equal(readFileSync(config, "utf8"), "OPENROUTER_API_KEY=sk-or-test\n");
 });
 
+test("install copies jev to a stable home, links the cli and the skill, and survives no key", () => {
+  const home = `${tmp}/home`;
+  const ienv = { ...env, HOME: home, JEV_CONFIG: `${home}/.config/jev/env` };
+  delete ienv.XDG_DATA_HOME;
+  const out = execFileSync(BIN, ["install"], { env: ienv, input: "", encoding: "utf8" });
+  assert.match(out, /key: {3}none yet/);
+  const installed = execFileSync(`${home}/.local/bin/jev`, ["--help"], { env: ienv, encoding: "utf8" });
+  assert.match(installed, /^jev ask/);
+  assert.ok(statSync(`${home}/.local/share/jev/src/cli.ts`).isFile() && statSync(`${home}/.agents/skills/jev/SKILL.md`).isFile());
+  assert.throws(() => statSync(`${home}/.local/share/jev/tests`), "tests and fixtures are not copied");
+  execFileSync(`${home}/.local/bin/jev`, ["install"], { env: ienv, input: "", encoding: "utf8" }); // running it again from the installed copy is a no-op relink
+});
+
 test("every call lands in the ledger, without the state", () => {
   const lines = readFileSync(`${tmp}/state/ledger.jsonl`, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   assert.ok(lines.length > 0 && lines.every((l) => l.questions && l.answers && !("state" in l)));
