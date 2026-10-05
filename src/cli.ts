@@ -7,7 +7,7 @@
  *   jev compact --transcript FILE | --hook claude-code                          should this session compact now?
  *   jev research -s TASK | --hook claude-code                                    does this task need a lookup first?
  *   jev laya    status | start [--wait] | stop                                       the local Laya server
- *   jev filter  -s QUERY [--top K] < RESULTS | --hook claude-code               keep the search results that answer the query
+ *   jev filter  -s QUERY < RESULTS | --hook claude-code                         keep the search results that answer the query
  *   jev setup                                                                    store the API key (handled by bin/jev)
  *   jev install                                                                  install from a clone or npx (handled by bin/jev)
  *
@@ -27,7 +27,7 @@ import {
 import { shouldCompact } from "./compact.ts";
 import { needsResearch } from "./research.ts";
 import { ensureLaya, isLocalLaya, status as layaStatus, stopLaya, supervise } from "./laya.ts";
-import { filterResults, KEEP } from "./filter.ts";
+import { filterResults } from "./filter.ts";
 
 const COMMAND_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_CHARS = 200_000;
@@ -39,7 +39,7 @@ jev watch   -c COMMAND -q QUESTIONS [-s STATE] [-p PATH]... [--every SECONDS] [-
 jev compact --transcript FILE | --hook claude-code
 jev research -s TASK | --hook claude-code
 jev laya    status | start [--wait] | stop
-jev filter  -s QUERY [--top K] < RESULTS | --hook claude-code
+jev filter  -s QUERY < RESULTS | --hook claude-code
 jev setup
 jev install
 QUESTIONS: JSON, or - to read it from stdin.
@@ -67,7 +67,7 @@ agent it runs under; the server stops a minute after the last agent exits. start
 (--wait until it answers; --hook claude-code for a silent SessionStart hook), stop stops it now, status shows the URL, the server and the agents keeping it up.
 
 filter: search results on stdin, in Exa's format (blocks opening with "Title: ", joined by a "---" line). Jev scores each
-against the query in parallel; the best --top K (default 5) stay whole, the others shrink to title and URL. Other text
+against the query in parallel; those at or above JEV_FILTER_LINE (default 0.1) stay whole, the others shrink to title and URL. Other text
 passes through. --hook claude-code reads a PostToolUse payload of an MCP search tool and replaces what the model sees.
 
 setup: choose the backend: a Jev key (TypeSafe apikey_... or OpenRouter sk-or-...), Laya on this machine (installs it),
@@ -195,8 +195,6 @@ async function compact() {
 
 async function filter() {
   const ask = async (s: unknown, q: any) => (await decide("filter", s, q)).answers as Record<string, any>;
-  const keep = o.top === undefined ? KEEP : Number(o.top);
-  if (!(Number.isInteger(keep) && keep > 0)) throw new Error("--top needs a whole number above 0");
   if (o.hook !== undefined) {
     layaWaitMs = 8_000;
     // Same rule as the other hooks: on any failure the model sees the tool's own output, untouched.
@@ -207,7 +205,7 @@ async function filter() {
       if (!query || !Array.isArray(input.tool_response)) return;
       let changed = false;
       const output = await Promise.all(input.tool_response.map(async (item: any) => {
-        const v = item?.type === "text" ? await filterResults(query, item.text, ask, keep) : null;
+        const v = item?.type === "text" ? await filterResults(query, item.text, ask) : null;
         if (!v) return item;
         changed = true;
         append("filter.log", `${new Date().toISOString()} ${input.tool_name} kept ${v.kept}/${v.total}: ${v.scores.map((x) => x.toFixed(2)).join(" ")}`);
@@ -221,7 +219,7 @@ async function filter() {
   }
   if (!o.state) throw new Error("filter needs -s QUERY with the results on stdin, or --hook claude-code");
   const text = readFileSync(0, "utf8");
-  console.log((await filterResults(o.state, text, ask, keep))?.text ?? text);
+  console.log((await filterResults(o.state, text, ask))?.text ?? text);
 }
 
 async function research() {

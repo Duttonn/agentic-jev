@@ -59,6 +59,13 @@ async function askAll(client: JevClient, items: { state: unknown; questions: any
   return out;
 }
 
+function keepAll(devS: number[], devL: boolean[], testS: number[], testL: boolean[]) {
+  const line = Math.floor(Math.min(...devS.filter((_, i) => devL[i])) * 100) / 100;
+  const kept = testS.filter((x, i) => testL[i] && x >= line).length, relevant = testL.filter(Boolean).length;
+  const cut = testS.filter((x, i) => !testL[i] && x < line).length, off = testL.length - relevant;
+  return { keep_all_line: line, test_relevant_kept: `${kept}/${relevant}`, test_off_topic_cut: `${cut}/${off}` };
+}
+
 /** AUC on every case; the line picked on dev; accuracy on test at 0.5, at the code's line, and at the dev line. */
 function noulReport(cases: any[], scores: number[], labels: boolean[], codeLine?: number) {
   const pick = (split: string) => cases.map((c, i) => (c.split === split ? i : -1)).filter((i) => i >= 0);
@@ -71,6 +78,9 @@ function noulReport(cases: any[], scores: number[], labels: boolean[], codeLine?
     ...(codeLine !== undefined ? { test_at_code_line: r2(accuracy(s(test), l(test), codeLine)), code_line: codeLine } : {}),
     dev_line: line,
     test_at_dev_line: r2(accuracy(s(test), l(test), line)),
+    // For a filter, cutting a relevant item costs more than keeping an off-topic one: the highest line that keeps every
+    // relevant dev case, and on test how many relevant cases it keeps and how many off-topic ones it cuts.
+    ...keepAll(s(dev), l(dev), s(test), l(test)),
     yes_range: [r2(Math.min(...scores.filter((_, i) => labels[i]))), r2(Math.max(...scores.filter((_, i) => labels[i])))],
     no_range: [r2(Math.min(...scores.filter((_, i) => !labels[i]))), r2(Math.max(...scores.filter((_, i) => !labels[i])))],
   };

@@ -144,23 +144,30 @@ test("research says when a task needs a lookup first, and its hook only speaks o
   }
 });
 
-test("filter keeps the search results that answer the query and replaces what the model sees", () => {
+test("filter keeps every relevant search result whole and shrinks only the off-topic ones", async () => {
+  const { filterResults } = await import("../src/filter.ts");
+  const block = (t: string) => `Title: ${t}\nURL: https://example.com/${t}\nHighlights:\n${t} text`;
+  const stub = (scores: number[]) => { let i = 0; return async () => ({ relevant: { noul: scores[i++] } }); };
+  const text = ["a", "b", "c", "d"].map(block).join("\n\n---\n\n");
+  assert.equal(await filterResults("q", text, stub([0.9, 0.95, 0.6, 0.31])), null, "all relevant: the output is left as it is");
+  const cut = (await filterResults("q", text, stub([0.9, 0.05, 0.95, 0.08])))!;
+  assert.deepEqual([cut.kept, cut.total], [2, 4]);
+  assert.match(cut.text, /^Title: c[\s\S]*Title: a[\s\S]*jev kept the 2 of 4[\s\S]*- d https:\/\/example.com\/d \(0\.08\)\n- b https/);
+  assert.equal((await filterResults("q", text, stub([0.05, 0.08, 0.02, 0.01])))!.kept, 1, "the best one stays whole even under the line");
+  assert.equal(await filterResults("q", "no results", stub([])), null, "other text passes through");
+
   const results = readFileSync(fileURLToPath(new URL("./fixtures/exa-results.txt", import.meta.url)), "utf8");
   const query = "Laya open source decision model, how to run it locally";
   const hook = (payload: object) => run(["filter", "--hook", "claude-code"], JSON.stringify({ hook_event_name: "PostToolUse", ...payload })).trim();
   const out = hook({ tool_name: "mcp__plugin_exa_exa__web_search_exa", tool_input: { query }, tool_response: [{ type: "text", text: results }] });
-  const [item] = JSON.parse(out).hookSpecificOutput.updatedToolOutput;
-  assert.equal(item.type, "text");
-  const [kept, list] = [item.text.split("\n\n---\n\njev kept")[0], item.text.split("\n").filter((l: string) => l.startsWith("- "))];
-  const keptTitles = kept.split("\n").filter((l: string) => l.startsWith("Title: "));
-  assert.ok(keptTitles.length >= 1 && keptTitles.length <= 5 && keptTitles.length + list.length === 8, item.text);
+  if (out) assert.equal(JSON.parse(out).hookSpecificOutput.updatedToolOutput[0].type, "text");
   if (LIVE) {
+    const kept = JSON.parse(out).hookSpecificOutput.updatedToolOutput[0].text.split("\n\n---\n\njev kept")[0];
     for (const off of ["pizza", "Resort", "guitar", "Stock market"]) assert.ok(!kept.includes(off), `${off} was kept`);
-    assert.ok(kept.includes("NandhaKishorM/laya on GitHub"));
+    for (const on of ["NandhaKishorM/laya on GitHub", "Laya: an open source alternative", "Jev vs Laya", "decision models"]) assert.ok(kept.includes(on), `${on} was cut`);
   }
   assert.equal(hook({ tool_name: "WebSearch", tool_input: { query }, tool_response: { query, results: [] } }), "", "built-in WebSearch passes through");
   assert.equal(hook({ tool_name: "mcp__x__web_search", tool_input: { query }, tool_response: [{ type: "text", text: "no results" }] }), "");
-  assert.equal(run(["filter", "-s", query], results.split("\n\n---\n\n").slice(0, 3).join("\n\n---\n\n")).trim().split("Title: ").length - 1, 3, "three results: nothing to cut");
 });
 
 test("setup stores a key with mode 600, picks the provider from its prefix, and keeps the other settings", () => {

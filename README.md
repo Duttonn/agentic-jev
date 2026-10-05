@@ -160,17 +160,23 @@ questions it needs fine-tuning first. Any server that answers the same `POST /v1
 
 `jev filter` cuts a list of search results down to the ones that answer the query. It reads Exa's
 format: blocks that open with `Title: `, joined by a `---` line. Jev scores every result against the
-query in parallel. The best `--top K` (default 5) stay whole, except those under 0.05, which are off
-topic. The others shrink to a title, a URL and their score, so a fetch can still bring one back. Text
-in any other shape passes through unchanged.
+query in parallel. Every result at or above the line stays whole; the others shrink to a title, a URL and
+their score, so a fetch can still bring one back. When none falls under the line, or the text has another
+shape, the output passes through unchanged.
+
+The line is 0.1 (`JEV_FILTER_LINE`). Cutting a relevant result costs more than keeping an off-topic one,
+so the line is the highest that keeps every relevant case of the bench's dev split (0.11 for Jev, rounded
+down). On the test split it kept 8 of 8 relevant results and cut 7 of 8 off-topic ones. A first version
+kept the best 5 instead, and on real Exa searches, where most results are good, it cut results that
+scored 0.83 to 0.96.
 
 The plugin runs it as a PostToolUse hook on Exa's web search tools and replaces what the model sees.
-On a sample of 8 results for a query about Laya, it kept the 4 about the model and dropped a pizza
+On a sample of 8 results for a query about Laya, it kept the 4 about the model and shrank a pizza
 guide, a guitar lesson, market news and a "Laya Beach Resort", each at 0.01. The built-in WebSearch
 is left alone: it returns about 3 KB of titles, URLs and a summary, so there is nothing to save.
 
 ```sh
-jev filter -s 'Laya open source decision model, how to run it locally' --top 4 < results.txt
+jev filter -s 'Laya open source decision model, how to run it locally' < results.txt
 ```
 
 ## Files and settings
@@ -181,6 +187,7 @@ jev filter -s 'Laya open source decision model, how to run it locally' --top 4 <
 | Ledger: one line per call, question ids, answers and usage, never the state | `~/.local/state/jev/ledger.jsonl` | `JEV_STATE_DIR` |
 | Compaction hook log | `~/.local/state/jev/compact.log` | `JEV_STATE_DIR` |
 | Search filter log: what each search kept, with the scores | `~/.local/state/jev/filter.log` | `JEV_STATE_DIR` |
+| Search filter line, default 0.1 (Jev); `npm run bench` gives another backend's (keep_all_line) | | `JEV_FILTER_LINE` |
 | Research hook errors | `~/.local/state/jev/research.log` | `JEV_STATE_DIR` |
 | Preferred search tools named in the research hint | | `JEV_RESEARCH_TOOLS` |
 | Research hint line, default 0.7 (Jev); `npm run bench` gives another backend's | | `JEV_RESEARCH_LINE` |
