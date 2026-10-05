@@ -5,6 +5,9 @@ probability, choice: one of your options, score: a level you describe) about fil
 output, or a short note, in about 300 ms for a fraction of a cent, without the content
 entering your context. Reach for it unasked:
 
+- A new task that may rest on outside facts (library API, current versions, a third-party error, a
+  link): `jev research -s '<the request>'`. If `hint` is not null, look it up with your search or
+  docs tools before acting.
 - A build or test fails: `jev ask -c '<the command>'` with a choice of bug_in_code / wrong_test /
   environment / flaky / other, before choosing a fix.
 - Before reporting done: the request in `-s`, the check in `-c`, a noul "does `output` show every

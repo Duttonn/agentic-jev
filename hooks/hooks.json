@@ -6,8 +6,28 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/bin/jev",
-            "args": ["compact", "--hook", "claude-code"],
+            "args": [
+              "compact",
+              "--hook",
+              "claude-code"
+            ],
             "timeout": 30
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/jev",
+            "args": [
+              "research",
+              "--hook",
+              "claude-code"
+            ],
+            "timeout": 10
           }
         ]
       }
