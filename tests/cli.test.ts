@@ -42,11 +42,19 @@ test("ask runs any command without a gate: one Jev call, the command really ran"
 
 test("files judges every file in parallel, questions from stdin", () => {
   const r = json(["files", "-q", "-", "src/**/*.ts"], MONEY);
-  assert.ok(r.calls >= 9 && r.results.every((x: any) => typeof x.answers.money.noul === "number"));
-  if (LIVE) {
-    const by = Object.fromEntries(r.results.map((x: any) => [x.path, x.answers.money.noul]));
-    assert.ok(by["src/domain/billing.ts"] > 0.5 && by["src/auth/jwt.ts"] < 0.5, JSON.stringify(by));
-  }
+  assert.ok(r.calls >= 9 && Object.values(r.results).every((a: any) => typeof a.money.noul === "number"));
+  if (LIVE) assert.ok(r.results["src/domain/billing.ts"].money.noul > 0.5 && r.results["src/auth/jwt.ts"].money.noul < 0.5, JSON.stringify(r.results));
+});
+
+test("output is one compact line by default, --full keeps types, probabilities and usage", () => {
+  const out = run(["files", "-q", KIND, "src/**/*.ts"]);
+  const full = run(["files", "-q", KIND, "src/**/*.ts", "--full"]);
+  assert.equal(out.trim().split("\n").length, 1);
+  assert.ok(!/"probabilities"|"type"/.test(out) && /"probabilities"/.test(full) && /"usage"/.test(full));
+  assert.ok(out.length < full.length / 3, `${out.length} vs ${full.length}`);
+  const a = json(["ask", "-q", KIND, "-s", "TypeError: cannot read properties of undefined"]).answers.kind;
+  assert.deepEqual(Object.keys(a), ["choice", "confidence"]);
+  assert.equal(a.confidence, Math.round(a.confidence * 100) / 100);
 });
 
 test("bad input fails with a message, not a call", () => {

@@ -30,6 +30,9 @@ Questions are a JSON object keyed by ids you pick. Three types:
     choice {"type":"choice","instructions":"Which ... is `output`?","criteria":{"a":"...","b":"...","other":"..."}}   -> { choice, confidence }
     score  {"type":"score","instructions":"How ... is `output`?","criteria":["lowest","...","highest"]}   -> { score, confidence, legend }
 
+Answers print as one line of JSON, rounded to two decimals. Add `--full` only when you need every
+option's probability. `jev files` returns `results` keyed by path.
+
 In `ask`, questions reference `output` (the command's result: command, exit_code, stdout, stderr),
 `files["path"]` (each `-p`), or `text` (your `-s` note, or its own field names if it is a JSON
 object). In `files`, they reference `content` and `path`. Ask everything you need in one call.
