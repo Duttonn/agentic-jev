@@ -31,6 +31,23 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__.*exa.*__web_search.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/jev",
+            "args": [
+              "filter",
+              "--hook",
+              "claude-code"
+            ],
+            "timeout": 15
+          }
+        ]
+      }
     ]
   }
 }

@@ -43,7 +43,8 @@ claude plugin marketplace add Duttonn/agentic-jev
 claude plugin install jev@agentic-jev
 ```
 
-This installs the skill, `jev` on the Bash tool's PATH, the compaction hook, and the research hook. For the key, run the npx
+This installs the skill, `jev` on the Bash tool's PATH, the compaction hook, the research hook, and the
+search-results filter. For the key, run the npx
 install above once from a terminal.
 
 ### Codex
@@ -119,6 +120,23 @@ context only on a yes. Slash commands and short follow-ups are skipped with no c
 a prompt hook can do the same: run `jev research -s "$PROMPT"` and pass `hint` to the model when it
 is not null. It adds one Jev call per prompt, about 300 ms.
 
+## Search results
+
+`jev filter` cuts a list of search results down to the ones that answer the query. It reads Exa's
+format: blocks that open with `Title: `, joined by a `---` line. Jev scores every result against the
+query in parallel. The best `--top K` (default 5) stay whole, except those under 0.05, which are off
+topic. The others shrink to a title, a URL and their score, so a fetch can still bring one back. Text
+in any other shape passes through unchanged.
+
+The plugin runs it as a PostToolUse hook on Exa's web search tools and replaces what the model sees.
+On a sample of 8 results for a query about Laya, it kept the 4 about the model and dropped a pizza
+guide, a guitar lesson, market news and a "Laya Beach Resort", each at 0.01. The built-in WebSearch
+is left alone: it returns about 3 KB of titles, URLs and a summary, so there is nothing to save.
+
+```sh
+jev filter -s 'Laya open source decision model, how to run it locally' --top 4 < results.txt
+```
+
 ## Files and settings
 
 | What | Where | Override |
@@ -126,6 +144,7 @@ is not null. It adds one Jev call per prompt, about 300 ms.
 | API key | `~/.config/jev/env` | `JEV_CONFIG`, or export the key |
 | Ledger: one line per call, question ids, answers and usage, never the state | `~/.local/state/jev/ledger.jsonl` | `JEV_STATE_DIR` |
 | Compaction hook log | `~/.local/state/jev/compact.log` | `JEV_STATE_DIR` |
+| Search filter log: what each search kept, with the scores | `~/.local/state/jev/filter.log` | `JEV_STATE_DIR` |
 | Research hook errors | `~/.local/state/jev/research.log` | `JEV_STATE_DIR` |
 | Preferred search tools named in the research hint | | `JEV_RESEARCH_TOOLS` |
 | Offline mock, no key needed | | `JEV_BACKEND=mock` |
