@@ -4,6 +4,7 @@
  *   jev ask     -q QUESTIONS [-s STATE] [-p PATH]... [-c COMMAND] [--cwd DIR]   one situation, one call
  *   jev files   -q QUESTIONS [-r] [--top K] [--cwd DIR] PATH_OR_GLOB...          the same questions of many files
  *   jev compact --transcript FILE | --hook claude-code                          should this session compact now?
+ *   jev research -s TASK | --hook claude-code                                    does this task need a lookup first?
  *   jev setup                                                                    store the API key (handled by bin/jev)
  *   jev install                                                                  install from a clone or npx (handled by bin/jev)
  *
@@ -21,6 +22,7 @@ import {
   ASK_JEV_DESCRIPTION, AskStateError, assembleState, emptyLedger, parseQuestions, record, summarize, type CommandOutput,
 } from "./levels/level10/index.ts";
 import { shouldCompact } from "./compact.ts";
+import { needsResearch } from "./research.ts";
 
 const COMMAND_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_CHARS = 200_000;
@@ -29,6 +31,7 @@ const STATE_DIR = process.env.JEV_STATE_DIR || join(process.env.XDG_STATE_HOME |
 const USAGE = `jev ask     -q QUESTIONS [-s STATE] [-p PATH]... [-c COMMAND] [--cwd DIR]
 jev files   -q QUESTIONS [-r] [--top K] [--cwd DIR] PATH_OR_GLOB...
 jev compact --transcript FILE | --hook claude-code
+jev research -s TASK | --hook claude-code
 jev setup
 jev install
 QUESTIONS: JSON, or - to read it from stdin.
@@ -42,6 +45,10 @@ the first question (a noul or a score), best first. Globs and directories expand
 
 compact: reads a Claude Code transcript and says whether to compact now, with a ready /compact line. --hook claude-code reads
 a Stop hook payload on stdin and prints a systemMessage only when compacting is worth it.
+
+research: does the task need facts from outside the user's files (docs, versions, prices, a third-party error) before
+acting? Prints the answers and a \`hint\` naming what to look up first, or null. --hook claude-code reads a UserPromptSubmit
+payload and adds the hint to the model's context only on a yes. JEV_RESEARCH_TOOLS names your preferred search tools.
 
 setup: prompts for a TypeSafe (apikey_...) or OpenRouter (sk-or-...) key and stores it in ~/.config/jev/env, mode 600.
 
@@ -65,7 +72,7 @@ const { values: o, positionals } = parseArgs({
   },
 });
 const [mode, ...targets] = positionals;
-if (o.help || !mode || (mode !== "compact" && !o.questions)) { console.log(USAGE); process.exit(o.help ? 0 : 2); }
+if (o.help || !mode || (mode !== "compact" && mode !== "research" && !o.questions)) { console.log(USAGE); process.exit(o.help ? 0 : 2); }
 
 const cwd = resolve(o.cwd ?? process.cwd());
 let ledger = emptyLedger();
@@ -131,6 +138,24 @@ async function compact() {
   print(o.full || !v.answers ? v : { ...v, answers: slim(v.answers) });
 }
 
+async function research() {
+  const ask = async (s: unknown, q: any) => (await decide("research", s, q)).answers as Record<string, any>;
+  if (o.hook !== undefined) {
+    // Same rule as the compaction hook: any failure is logged and the prompt goes through untouched.
+    try {
+      if (o.hook !== "claude-code") throw new Error(`unknown hook "${o.hook}"; supported: claude-code`);
+      const v = await needsResearch(String(JSON.parse(readFileSync(0, "utf8")).prompt ?? ""), ask);
+      if (v.hint) console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: v.hint } }));
+    } catch (err: any) {
+      append("research.log", `${new Date().toISOString()} error: ${err?.message ?? err}`);
+    }
+    return;
+  }
+  if (!o.state) throw new Error("research needs -s TASK or --hook claude-code");
+  const v = await needsResearch(o.state === "-" ? readFileSync(0, "utf8") : o.state, ask);
+  print(o.full || !v.answers ? v : { ...v, answers: slim(v.answers) });
+}
+
 try {
   if (mode === "ask") {
     const questions = parseQuestions(o.questions === "-" ? readFileSync(0, "utf8") : o.questions!);
@@ -156,8 +181,10 @@ try {
       : { results: Object.fromEntries(results.map((r) => [r.path, slim(r.answers)])), ...(result.skipped.length ? { skipped: result.skipped } : {}), calls: result.calls, cost: summarize(ledger, 0) });
   } else if (mode === "compact") {
     await compact();
+  } else if (mode === "research") {
+    await research();
   } else {
-    throw new Error(`unknown command "${mode}"; use ask, files, compact or setup`);
+    throw new Error(`unknown command "${mode}"; use ask, files, compact, research or setup`);
   }
 } catch (err: any) {
   console.error(err instanceof AskStateError ? err.message : `jev ${mode}: ${err?.message ?? err}`);

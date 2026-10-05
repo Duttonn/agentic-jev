@@ -111,6 +111,25 @@ test("compact stays silent and makes no call on a short follow-up", async () => 
   assert.deepEqual([v.tier, v.reason], ["silent", "short follow-up to the last turn"]);
 });
 
+test("research says when a task needs a lookup first, and its hook only speaks on a yes", () => {
+  const ledger = () => readFileSync(`${tmp}/state/ledger.jsonl`, "utf8").trim().split("\n").length;
+  const prompt = (p: string) => run(["research", "--hook", "claude-code"], JSON.stringify({ session_id: "t", hook_event_name: "UserPromptSubmit", prompt: p })).trim();
+  const before = ledger();
+  assert.equal(prompt("ok go O4") + prompt("/compact"), "", "follow-ups and slash commands pass through");
+  assert.equal(ledger(), before, "and cost no call");
+  const yes = json(["research", "-s", "Upgrade the project to the latest Expo SDK and fix whatever breaks"]);
+  assert.ok(typeof yes.answers.need.noul === "number" && "hint" in yes);
+  const hooked = prompt("Use the Stripe API to add subscription proration to checkout");
+  if (hooked) assert.match(JSON.parse(hooked).hookSpecificOutput.additionalContext, /^jev: /);
+  if (LIVE) {
+    assert.match(yes.hint, /current, dated sources/);
+    assert.equal(JSON.parse(hooked).hookSpecificOutput.hookEventName, "UserPromptSubmit");
+    for (const s of ["Rename the variable tmp to buffer in src/parser.ts", "Add a link to https://example.com in the footer of index.html"]) assert.equal(json(["research", "-s", s]).hint, null, s);
+    const tools = execFileSync(BIN, ["research", "-s", "Summarize https://github.com/disler/ten-levels-of-jev"], { env: { ...env, JEV_RESEARCH_TOOLS: "web_search" }, encoding: "utf8" });
+    assert.match(JSON.parse(tools).hint, /preferred: web_search\).*the link the user gave/);
+  }
+});
+
 test("setup stores the key with mode 600 and picks the provider from its prefix", () => {
   const config = `${tmp}/config/env`;
   const setup = (key: string) => execFileSync(BIN, ["setup"], { env: { ...env, JEV_CONFIG: config }, input: key + "\n", encoding: "utf8" });

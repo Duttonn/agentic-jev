@@ -17,6 +17,7 @@ not ask for the key in the conversation.
     jev ask -q '<json>' [-c '<command>'] [-p <path>]... [-s '<short note>'] [--cwd DIR]
     jev files -q '<json>' '<glob>'... [--top K] one call per file, in parallel, up to 255 files
     jev compact --transcript <session.jsonl>    should this session compact now?
+    jev research -s '<the user request>'        does this task need a lookup before acting?
 
 `-q -` reads the questions from stdin. Use a quoted heredoc when they contain quotes:
 
@@ -44,6 +45,10 @@ category that won. Each call stays short, which is where Jev is most accurate.
 
 ## When to reach for it
 
+- **A new task arrives** and it may rest on facts outside the user's files (a library's API,
+  current versions, prices, a third-party error, a link the user gave). Run `jev research -s
+  '<the request>'`. If `hint` is not null, look those facts up first with the search, fetch or
+  docs tools you have, then act. Under Claude Code the plugin does this on every prompt.
 - **A build or test fails.** Before choosing a fix, pass the failing command in `-c` with a choice
   of bug_in_code / wrong_test / environment / flaky / other.
 - **Before reporting work as done.** Put the user's request in `-s` and the check in `-c`, and ask

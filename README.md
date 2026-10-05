@@ -43,7 +43,7 @@ claude plugin marketplace add Duttonn/agentic-jev
 claude plugin install jev@agentic-jev
 ```
 
-This installs the skill, `jev` on the Bash tool's PATH, and the compaction hook. For the key, run the npx
+This installs the skill, `jev` on the Bash tool's PATH, the compaction hook, and the research hook. For the key, run the npx
 install above once from a terminal.
 
 ### Codex
@@ -64,6 +64,9 @@ jev ask -c 'npm test' -q '{"kind":{"type":"choice","instructions":"What kind of 
 
 # which files matter, before opening any; --top 5 keeps the five best, best first
 jev files 'src/**/*.ts' --top 5 -q '{"relevant":{"type":"noul","instructions":"Does `content` compute invoice totals?"}}'
+
+# does this task need a lookup before acting? prints a hint naming what to look up first, or null
+jev research -s 'Upgrade the project to the latest Expo SDK and fix whatever breaks'
 
 # should this session compact now?
 jev compact --transcript ~/.claude/projects/<project>/<session>.jsonl
@@ -99,6 +102,19 @@ The lines are context tokens. With an auto-compact window W, from `JEV_COMPACT_W
 Code's `autoCompactWindow` setting, they sit at W/6, W/3 and 7W/12. Without a window they are 100k,
 200k and 350k. `JEV_COMPACT_LINES=notice,recommend,request` overrides both.
 
+## Research
+
+`jev research` asks Jev whether a request rests on facts from outside the user's files: a library's
+docs or API, current versions, prices, a third-party error, a link the user gave. At 0.7 or above it
+returns a hint naming what to look up first. jev names no tool: the agent uses the search, fetch or
+docs tools it has. `JEV_RESEARCH_TOOLS` (in `~/.config/jev/env`, for example
+`JEV_RESEARCH_TOOLS=web_search, fetch`) adds your preferred ones to the hint.
+
+As a Claude Code UserPromptSubmit hook (the plugin installs it), the hint goes into the model's
+context only on a yes. Slash commands and short follow-ups are skipped with no call. Any harness with
+a prompt hook can do the same: run `jev research -s "$PROMPT"` and pass `hint` to the model when it
+is not null. It adds one Jev call per prompt, about 300 ms.
+
 ## Files and settings
 
 | What | Where | Override |
@@ -106,6 +122,8 @@ Code's `autoCompactWindow` setting, they sit at W/6, W/3 and 7W/12. Without a wi
 | API key | `~/.config/jev/env` | `JEV_CONFIG`, or export the key |
 | Ledger: one line per call, question ids, answers and usage, never the state | `~/.local/state/jev/ledger.jsonl` | `JEV_STATE_DIR` |
 | Compaction hook log | `~/.local/state/jev/compact.log` | `JEV_STATE_DIR` |
+| Research hook errors | `~/.local/state/jev/research.log` | `JEV_STATE_DIR` |
+| Preferred search tools named in the research hint | | `JEV_RESEARCH_TOOLS` |
 | Offline mock, no key needed | | `JEV_BACKEND=mock` |
 
 ## Test
