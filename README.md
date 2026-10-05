@@ -2,7 +2,8 @@
 
 Jev inside any agentic coding environment. [Jev](https://typesafe.ai) answers typed questions in about
 300 ms for a fraction of a cent: a yes/no probability, a pick from options you declare, or a score on
-levels you describe. This package puts that in reach of a coding agent, so it can settle bounded
+levels you describe. [Laya](https://github.com/NandhaKishorM/laya), an open-weights model with the same
+API, can stand in for it on your machine or on a team server. This package puts that in reach of a coding agent, so it can settle bounded
 judgment calls without reasoning them out at length or reading files into its context:
 
 - **`jev` CLI.** Works in any agent that has a shell. `jev ask` judges one situation: your note, files it
@@ -16,11 +17,13 @@ judgment calls without reasoning them out at length or reading files into its co
 - **`AGENTS.snippet.md`.** The same guidance, for agents that read an instructions file instead of skills.
 
 Built on [disler/ten-levels-of-jev](https://github.com/disler/ten-levels-of-jev) (MIT). Its Jev client
-and its levels 7 to 10 are vendored unchanged under `src/core` and `src/levels`, with their tests.
+and its levels 7 to 10 are vendored under `src/core` and `src/levels`, with their tests. The one change is a
+`laya` provider in `src/core/client.ts`.
 
 ## Install
 
-Needs Node 22.18 or later, and a Jev key: TypeSafe (`apikey_...`) or OpenRouter (`sk-or-...`).
+Needs Node 22.18 or later, and a decision model: a Jev key (TypeSafe `apikey_...` or OpenRouter `sk-or-...`),
+or Laya, which setup installs on this machine (uv or Python 3.10+) or finds on another one.
 
 ```sh
 npx -y github:Duttonn/agentic-jev install
@@ -30,9 +33,10 @@ Or from a clone: `bin/jev install`. Either way, the install does four things:
 - copies jev to `~/.local/share/jev`;
 - links `jev` into `~/.local/bin`;
 - links the skill into `~/.agents/skills/jev`, where Codex and other agents look for user skills;
-- asks for the key if none is set, and stores it in `~/.config/jev/env`, mode 600.
+- runs `jev setup` if nothing is configured: a Jev key, Laya on this machine, or Laya on another machine,
+  stored in `~/.config/jev/env`, mode 600.
 
-Run the same command again to update. `jev setup` replaces the key at any time. A key already exported
+Run the same command again to update. `jev setup` changes the choice at any time. A key already exported
 as `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY` takes precedence over the file. `JEV_HOME`, `JEV_BIN_DIR`
 and `JEV_SKILLS_DIR` move the three install locations.
 
@@ -43,7 +47,8 @@ claude plugin marketplace add Duttonn/agentic-jev
 claude plugin install jev@agentic-jev
 ```
 
-This installs the skill, `jev` on the Bash tool's PATH, the compaction hook, and the research hook. For the key, run the npx
+This installs the skill, `jev` on the Bash tool's PATH, the compaction hook, the research hook, and a
+SessionStart hook that warms a local Laya (it does nothing with any other backend). For the key, run the npx
 install above once from a terminal.
 
 ### Codex
@@ -119,6 +124,37 @@ context only on a yes. Slash commands and short follow-ups are skipped with no c
 a prompt hook can do the same: run `jev research -s "$PROMPT"` and pass `hint` to the model when it
 is not null. It adds one Jev call per prompt, about 300 ms.
 
+## Laya
+
+`jev setup` offers three backends:
+
+1. **Jev**, TypeSafe's hosted API, with a key.
+2. **Laya on this machine.** Setup installs `laya[serve]` in `~/.local/share/jev-laya` (about 0.7 GB of
+   Python packages; the 1.4 GB of model files come on first start) and checks one call. After that, jev
+   starts `laya-serve` on `127.0.0.1:8765` at the first call of an agent session and stops it a minute
+   after the last session ends.
+3. **Laya on another machine.** The URL of a `laya-serve`, and its key if it was started with
+   `LAYA_API_KEY`.
+
+The local server follows agent sessions. Each call registers the agent it runs under: the first parent
+process that is not a shell (`claude`, `codex`, an editor). A detached supervisor keeps `laya-serve` up
+while one of them is alive, and stops it 60 seconds after the last one exits. A crashed session ends the
+same way as a closed one. `jev laya status` shows the server and the agents keeping it up; `jev laya stop`
+stops it now. The first call of a session waits for a cold start, about 6 s on an M4 Pro. After that a
+question takes about 45 ms, against about 300 ms for Jev. The server uses 0.9 GB of RAM with its English
+and multilingual checkpoints loaded.
+
+jev sends `max_len: 8192` with every call. Laya otherwise reads 512 tokens and drops the rest of the
+state: on a 2.8k-token diff, it dropped 83% and answered 0.38 where the full read answered 0.73.
+
+Quality is the catch. On the 14 labelled prompts of the research check, Jev answers 14/14 and Laya 7/14:
+it says no to every one, with no separation between the two groups. On the community
+[Decision Index](https://multimodalart-jev-decision-index.static.hf.space/index.html) (54 benchmarks,
+2026-09-28), balanced skill is 57.9 for Jev and 6.0 for Laya. Laya is fast and private, but for jev's
+questions it needs fine-tuning first. Any server that answers the same `POST /v1/systemone` (llama.cpp's
+`llama-server` now does, for several open decision models) should work through `LAYA_URL`; only
+`laya-serve` is tested.
+
 ## Files and settings
 
 | What | Where | Override |
@@ -128,7 +164,12 @@ is not null. It adds one Jev call per prompt, about 300 ms.
 | Compaction hook log | `~/.local/state/jev/compact.log` | `JEV_STATE_DIR` |
 | Research hook errors | `~/.local/state/jev/research.log` | `JEV_STATE_DIR` |
 | Preferred search tools named in the research hint | | `JEV_RESEARCH_TOOLS` |
-| Offline mock, no key needed | | `JEV_BACKEND=mock` |
+| Backend: `typesafe`, `openrouter`, `laya` or `mock` (offline, no key) | `~/.config/jev/env` | `JEV_BACKEND` |
+| Laya server URL, default `http://127.0.0.1:8765` | `~/.config/jev/env` | `LAYA_URL` |
+| Laya server key, when it has one | `~/.config/jev/env` | `LAYA_API_KEY` |
+| jev starts and stops Laya on this machine | `~/.config/jev/env` | `JEV_LAYA_LOCAL=1` |
+| Local Laya install | `~/.local/share/jev-laya` | `JEV_LAYA_HOME` |
+| Local Laya log | `~/.local/state/jev/laya/server.log` | `JEV_STATE_DIR` |
 
 ## Test
 

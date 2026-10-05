@@ -6,6 +6,7 @@
  *   jev watch   -c COMMAND -q QUESTIONS [--every SECONDS] [--until]              poll, print only when the answer changes
  *   jev compact --transcript FILE | --hook claude-code                          should this session compact now?
  *   jev research -s TASK | --hook claude-code                                    does this task need a lookup first?
+ *   jev laya    status | start [--wait] | stop                                       the local Laya server
  *   jev setup                                                                    store the API key (handled by bin/jev)
  *   jev install                                                                  install from a clone or npx (handled by bin/jev)
  *
@@ -17,13 +18,14 @@ import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { jev } from "./core/client.ts";
+import { jev, layaUrl } from "./core/client.ts";
 import { askFiles } from "./levels/level09/index.ts";
 import {
   ASK_JEV_DESCRIPTION, AskStateError, assembleState, emptyLedger, parseQuestions, record, summarize, type CommandOutput,
 } from "./levels/level10/index.ts";
 import { shouldCompact } from "./compact.ts";
 import { needsResearch } from "./research.ts";
+import { ensureLaya, isLocalLaya, status as layaStatus, stopLaya, supervise } from "./laya.ts";
 
 const COMMAND_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_CHARS = 200_000;
@@ -34,6 +36,7 @@ jev files   -q QUESTIONS [-r] [--top K] [--cwd DIR] PATH_OR_GLOB...
 jev watch   -c COMMAND -q QUESTIONS [-s STATE] [-p PATH]... [--every SECONDS] [--until] [--cwd DIR]
 jev compact --transcript FILE | --hook claude-code
 jev research -s TASK | --hook claude-code
+jev laya    status | start [--wait] | stop
 jev setup
 jev install
 QUESTIONS: JSON, or - to read it from stdin.
@@ -56,7 +59,12 @@ research: does the task need facts from outside the user's files (docs, versions
 acting? Prints the answers and a \`hint\` naming what to look up first, or null. --hook claude-code reads a UserPromptSubmit
 payload and adds the hint to the model's context only on a yes. JEV_RESEARCH_TOOLS names your preferred search tools.
 
-setup: prompts for a TypeSafe (apikey_...) or OpenRouter (sk-or-...) key and stores it in ~/.config/jev/env, mode 600.
+laya: with Laya on this machine (jev setup, option 2), every call starts laya-serve if it is down and registers the
+agent it runs under; the server stops a minute after the last agent exits. start registers the caller and starts it
+(--wait until it answers; --hook claude-code for a silent SessionStart hook), stop stops it now, status shows the URL, the server and the agents keeping it up.
+
+setup: choose the backend: a Jev key (TypeSafe apikey_... or OpenRouter sk-or-...), Laya on this machine (installs it),
+or Laya on another machine (its URL). Stored in ~/.config/jev/env, mode 600.
 
 install: copies jev to ~/.local/share/jev, links it into ~/.local/bin and its skill into ~/.agents/skills, and runs
 setup when no key is set. Works from a clone (bin/jev install) or from npx (npx github:Duttonn/agentic-jev install).`;
@@ -75,12 +83,13 @@ const { values: o, positionals } = parseArgs({
     full: { type: "boolean" },
     top: { type: "string" },
     every: { type: "string" },
+    wait: { type: "boolean" },
     until: { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
 });
 const [mode, ...targets] = positionals;
-if (o.help || !mode || (mode !== "compact" && mode !== "research" && !o.questions)) { console.log(USAGE); process.exit(o.help ? 0 : 2); }
+if (o.help || !mode || (!["compact", "research", "laya"].includes(mode) && !o.questions)) { console.log(USAGE); process.exit(o.help ? 0 : 2); }
 
 const cwd = resolve(o.cwd ?? process.cwd());
 let ledger = emptyLedger();
@@ -89,10 +98,16 @@ function append(file: string, line: string) {
   try { mkdirSync(STATE_DIR, { recursive: true }); appendFileSync(join(STATE_DIR, file), line + "\n"); } catch { /* the ledger is optional */ }
 }
 
+/** How long a call waits for a local Laya that is still starting. Hooks wait less than their own timeout. */
+let layaWaitMs = 90_000;
+
 /** One Jev call, counted. The ledger keeps question ids and answers, never the state. */
 async function decide(tool: string, state: any, questions: any) {
-  const result = await jev.systemOne(state, questions);
-  ledger = record(ledger, result.usage as any, Object.keys(result.answers).length);
+  if (isLocalLaya()) await ensureLaya(STATE_DIR, layaWaitMs);
+  const result = await jev.systemOne(state, questions).catch((err) => {
+    throw jev.provider === "laya" && /fetch failed/.test(String(err?.message)) ? new Error(`Laya is not reachable at ${layaUrl()}`) : err;
+  });
+  ledger = record(ledger, jev.provider === "laya" ? { ...result.usage, cost: 0 } as any : result.usage as any, Object.keys(result.answers).length);
   const answers = JSON.stringify(result.answers, (k, v) => (k === "probabilities" ? undefined : v));
   append("ledger.jsonl", `{"at":"${new Date().toISOString()}","tool":"${tool}","cwd":${JSON.stringify(cwd)},"questions":${JSON.stringify(Object.keys(questions))},"answers":${answers},"usage":${JSON.stringify(result.usage)}}`);
   return result;
@@ -152,6 +167,7 @@ async function watch() {
 async function compact() {
   const ask = async (s: unknown, q: any) => (await decide("compact", s, q)).answers as Record<string, any>;
   if (o.hook !== undefined) {
+    layaWaitMs = 25_000;
     // A hook must never get in a turn's way: any failure is logged and the hook stays silent.
     try {
       if (o.hook !== "claude-code") throw new Error(`unknown hook "${o.hook}"; supported: claude-code`);
@@ -173,6 +189,7 @@ async function compact() {
 async function research() {
   const ask = async (s: unknown, q: any) => (await decide("research", s, q)).answers as Record<string, any>;
   if (o.hook !== undefined) {
+    layaWaitMs = 8_000;
     // Same rule as the compaction hook: any failure is logged and the prompt goes through untouched.
     try {
       if (o.hook !== "claude-code") throw new Error(`unknown hook "${o.hook}"; supported: claude-code`);
@@ -217,8 +234,19 @@ try {
     await compact();
   } else if (mode === "research") {
     await research();
+  } else if (mode === "laya") {
+    const [action = "status"] = targets;
+    if (action === "supervise") await supervise(STATE_DIR);
+    else if (action === "start") {
+      // A SessionStart hook runs this for every user; it only acts when Laya runs on this machine, and says nothing.
+      if (isLocalLaya()) await ensureLaya(STATE_DIR, o.wait ? 600_000 : 0);
+      if (o.hook === undefined) print(await layaStatus(STATE_DIR));
+    }
+    else if (action === "stop") print({ stopped: stopLaya(STATE_DIR) });
+    else if (action === "status") print(await layaStatus(STATE_DIR));
+    else throw new Error(`unknown laya action "${action}"; use status, start or stop`);
   } else {
-    throw new Error(`unknown command "${mode}"; use ask, files, watch, compact, research or setup`);
+    throw new Error(`unknown command "${mode}"; use ask, files, watch, compact, research, laya or setup`);
   }
 } catch (err: any) {
   console.error(err instanceof AskStateError ? err.message : `jev ${mode}: ${err?.message ?? err}`);

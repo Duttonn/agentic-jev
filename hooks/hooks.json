@@ -31,6 +31,23 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/jev",
+            "args": [
+              "laya",
+              "start",
+              "--hook",
+              "claude-code"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

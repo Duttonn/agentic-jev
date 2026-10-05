@@ -8,13 +8,67 @@ done
 root=$(cd "$(dirname "$self")/.." && pwd)
 config=${JEV_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/jev/env}
 
+# setvar NAME VALUE: set one line of the config and keep the others. An empty VALUE removes the line.
+setvar() {
+  mkdir -p "$(dirname "$config")"
+  (umask 077; { [ -f "$config" ] && grep -v "^$1=" "$config"; [ -n "$2" ] && printf '%s=%s\n' "$1" "$2"; } > "$config.tmp"; mv "$config.tmp" "$config")
+}
+# A hidden prompt: what is typed may be a key.
+secret() { printf '%s' "$1"; stty -echo 2>/dev/null; read -r REPLY; stty echo 2>/dev/null; echo; }
+
+# Laya: a venv with laya[serve], outside the jev install so updates keep it. uv first, it can fetch Python itself.
+laya_install() {
+  home=${JEV_LAYA_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/jev-laya}
+  if [ -x "$home/venv/bin/laya-serve" ]; then echo "laya:  installed in $home"; return 0; fi
+  free=$(df -Pk "$HOME" | awk 'NR==2 {print int($4/1048576)}')
+  echo "laya:  installing into $home: about 0.7 GB of Python packages, then 1.4 GB of model files on first start ($free GB free)"
+  [ "$free" -ge 4 ] || { echo "jev setup: Laya needs about 4 GB free" >&2; return 1; }
+  if command -v uv >/dev/null 2>&1; then
+    uv venv -q --python 3.11 "$home/venv" && uv pip install -q --python "$home/venv/bin/python" "laya[serve]"
+  else
+    py=
+    for c in python3.13 python3.12 python3.11 python3.10 python3; do
+      command -v $c >/dev/null 2>&1 && $c -c 'import sys; sys.exit(sys.version_info < (3, 10))' && py=$c && break
+    done
+    [ -n "$py" ] || { echo "jev setup: Laya needs uv or Python >= 3.10" >&2; return 1; }
+    "$py" -m venv "$home/venv" && "$home/venv/bin/pip" install -q "laya[serve]"
+  fi
+}
+
 if [ "$1" = setup ]; then
-  printf 'Jev API key (TypeSafe apikey_... or OpenRouter sk-or-...): '
-  stty -echo 2>/dev/null; read -r key; stty echo 2>/dev/null; echo
-  [ -n "$key" ] || { echo "jev setup: no key entered" >&2; exit 1; }
-  case $key in sk-or-*) var=OPENROUTER_API_KEY ;; *) var=TYPESAFE_API_KEY ;; esac
-  mkdir -p "$(dirname "$config")" && (umask 077 && printf '%s=%s\n' "$var" "$key" > "$config")
-  echo "jev setup: saved $var to $config"
+  cat <<'EOF'
+Which decision model should jev use?
+  1) Jev, TypeSafe's hosted API: a TypeSafe (apikey_...) or OpenRouter (sk-or-...) key
+  2) Laya on this machine: open weights, free, runs only while an agent session uses it
+  3) Laya on another machine: the URL of a laya-serve someone runs for you
+EOF
+  secret 'Choice [1], or paste a key: '; choice=$REPLY key=
+  case $choice in
+    apikey_*|sk-or-*) key=$choice choice=1 ;;
+    ''|1) choice=1; secret 'Key: '; key=$REPLY ;;
+  esac
+  case $choice in
+    1)
+      [ -n "$key" ] || { echo "jev setup: no key entered" >&2; exit 1; }
+      case $key in sk-or-*) var=OPENROUTER_API_KEY backend=openrouter ;; *) var=TYPESAFE_API_KEY backend=typesafe ;; esac
+      setvar "$var" "$key"; setvar JEV_BACKEND $backend; setvar JEV_LAYA_LOCAL ""
+      echo "jev setup: saved $var to $config" ;;
+    2)
+      laya_install || exit 1
+      setvar JEV_BACKEND laya; setvar JEV_LAYA_LOCAL 1; setvar LAYA_URL "${LAYA_URL:-http://127.0.0.1:8765}"; setvar LAYA_API_KEY ""
+      echo "laya:  starting once to fetch the model files and check a call"
+      JEV_LAYA_NO_REGISTER=1 "$root/bin/jev" laya start --wait >/dev/null || exit 1
+      JEV_LAYA_NO_REGISTER=1 "$root/bin/jev" ask -s hello -q '{"greeting":{"type":"noul","instructions":"Is `text` a greeting?"}}' || exit 1
+      echo "jev setup: Laya runs on this machine; it starts with the first call of an agent session and stops a minute after the last one ends" ;;
+    3)
+      printf 'laya-serve URL (http://host:8000): '; read -r url
+      [ -n "$url" ] || { echo "jev setup: no URL entered" >&2; exit 1; }
+      secret "Its key, if it was started with LAYA_API_KEY (Enter for none): "
+      setvar JEV_BACKEND laya; setvar LAYA_URL "$url"; setvar LAYA_API_KEY "$REPLY"; setvar JEV_LAYA_LOCAL ""
+      "$root/bin/jev" ask -s hello -q '{"greeting":{"type":"noul","instructions":"Is `text` a greeting?"}}' || exit 1
+      echo "jev setup: using Laya at $url" ;;
+    *) echo "jev setup: unknown choice \"$choice\"" >&2; exit 1 ;;
+  esac
   exit 0
 fi
 
