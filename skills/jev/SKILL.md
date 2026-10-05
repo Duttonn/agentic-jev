@@ -38,6 +38,10 @@ In `ask`, questions reference `output` (the command's result: command, exit_code
 object). In `files`, they reference `content` and `path`. Ask everything you need in one call.
 Always give a choice an `other` option. Describe situations, not degrees.
 
+A choice over many options (more than about ten: skills, modules, services, error families) goes
+in two calls: first a choice over a few categories, then a choice over the options of the
+category that won. Each call stays short, which is where Jev is most accurate.
+
 ## When to reach for it
 
 - **A build or test fails.** Before choosing a fix, pass the failing command in `-c` with a choice
