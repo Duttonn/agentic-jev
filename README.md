@@ -193,9 +193,12 @@ jev filter -s 'Laya open source decision model, how to run it locally' --top 4 <
 
 ## Bench
 
-`npm run bench` asks jev's fixed questions about 108 hand-labelled cases written for no one in
-particular. The cases cover three families:
-- the research check: 48 requests in English, French and German, half needing a lookup;
+`npm run bench` asks jev's fixed questions about 172 cases, none of them from any one user. The cases
+cover three families:
+- the research check: 48 written requests in English, French and German, half needing a lookup, plus
+  64 real first prompts from [DevGPT](https://doi.org/10.5281/zenodo.10086809) (developers' shared
+  ChatGPT conversations, CC BY 4.0). Those were sampled across issues, PRs, commits, files, discussions
+  and Hacker News, and labelled by hand; 10 of the 64 need a lookup;
 - the search filter: 5 queries with 8 results each, with look-alike distractors;
 - failure triage: 20 command outputs.
 
@@ -209,11 +212,17 @@ Laya, or any `/v1/systemone` server behind `LAYA_URL`. Results go to `bench/resu
 | Research: test accuracy at 0.7 | 0.92 | 0.75 | 0.50 |
 | Research: line from dev, test accuracy | 0.385, 0.96 | 0.29, 0.96 | 0.415, 0.63 |
 | Research: what to look up | 0.96 | 0.83 | 0.38 |
+| Real requests (DevGPT): AUC | 0.93 | not run | 0.70 |
+| Real requests: test accuracy at 0.7, at 0.5 | 0.91, 0.97 | not run | 0.91, 0.78 |
 | Filter: AUC, test accuracy at 0.5 | 0.99, 0.94 | 1.00, 1.00 | 0.95, 0.56 |
 | Triage | 0.95 | 0.95 | 0.40 |
 
 decider-4b ranks as well as Jev but is less sure of itself: it needs its own line, which
 `JEV_RESEARCH_LINE=0.29` sets. Laya does not separate the research cases at any line.
+
+Even for Jev, 0.7 is strict. On both test sets, the written one and the real one, 0.5 does better: 0.96
+and 0.97 against 0.92 and 0.91. On the real requests, a constant "no" already scores 0.875, so 0.7
+barely beats it.
 
 The real-use check below shows the limit of that line. On 80 prompts from one user's transcripts, Jev
 said 16 needed a lookup. decider-4b still ranked them well (AUC 0.88 against Jev), but at 0.29 it agreed

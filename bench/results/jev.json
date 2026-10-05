@@ -1,30 +1,48 @@
 {
  "backend": "typesafe",
- "at": "2026-10-05T13:12:21.461Z",
+ "at": "2026-10-05T13:39:47.279Z",
  "research_need": {
   "auc": 1,
   "test_at_0_5": 0.96,
   "test_at_code_line": 0.92,
   "code_line": 0.7,
-  "dev_line": 0.385,
+  "dev_line": 0.38,
   "test_at_dev_line": 0.96,
   "yes_range": [
-   0.26,
+   0.27,
    0.98
   ],
   "no_range": [
    0.03,
-   0.31
+   0.29
   ]
  },
  "research_kind": {
   "accuracy": 0.96,
   "cases": 24
  },
+ "research_real": {
+  "auc": 0.93,
+  "test_at_0_5": 0.97,
+  "test_at_code_line": 0.91,
+  "code_line": 0.7,
+  "dev_line": 0.34,
+  "test_at_dev_line": 0.97,
+  "yes_range": [
+   0,
+   0.91
+  ],
+  "no_range": [
+   0,
+   0.53
+  ],
+  "cases": 64,
+  "yes": 10
+ },
  "filter_relevant": {
   "auc": 0.99,
   "test_at_0_5": 0.94,
-  "dev_line": 0.31,
+  "dev_line": 0.325,
   "test_at_dev_line": 0.94,
   "yes_range": [
    0.11,
@@ -32,13 +50,13 @@
   ],
   "no_range": [
    0.01,
-   0.17
+   0.2
   ]
  },
  "triage_kind": {
   "accuracy": 0.95,
   "cases": 20
  },
- "median_ms": 236,
- "calls": 108
+ "median_ms": 233,
+ "calls": 172
 }

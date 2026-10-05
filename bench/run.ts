@@ -2,6 +2,9 @@
  * The criteria bench: jev's fixed questions against hand-labelled, general cases, on whatever backend JEV_BACKEND selects.
  *
  *   npm run bench -- [--name NAME]                       every family; results also go to bench/results/NAME.json
+ *
+ * research-devgpt.jsonl holds 64 real first prompts from DevGPT (developers' shared ChatGPT conversations, CC BY 4.0,
+ * doi:10.5281/zenodo.10086809), sampled by source and labelled by hand: does answering well need a lookup?
  *   npm run bench -- --agree DIR [--n 60]                validation: real prompts from Claude Code transcripts under DIR,
  *                                                        labelled by Jev (the teacher), against this backend
  *
@@ -77,23 +80,27 @@ function noulReport(cases: any[], scores: number[], labels: boolean[], codeLine?
 }
 
 async function bench() {
-  const research = load("research"), filter = load("filter"), triage = load("triage");
-  const [ra, fa, ta] = await Promise.all([
+  const research = load("research"), real = load("research-devgpt"), filter = load("filter"), triage = load("triage");
+  const [ra, da, fa, ta] = await Promise.all([
     askAll(jev, research.map((c) => ({ state: { task: c.task }, questions: RESEARCH_QUESTIONS }))),
+    askAll(jev, real.map((c) => ({ state: { task: c.task }, questions: RESEARCH_QUESTIONS }))),
     askAll(jev, filter.map((c) => ({ state: { query: c.query, result: c.result }, questions: RELEVANT }))),
     askAll(jev, triage.map((c) => ({ state: { output: c.output }, questions: TRIAGE }))),
   ]);
   const needed = research.map((c, i) => [c, ra[i].answers.kind.choice] as const).filter(([c]) => c.need);
+  // A hint fires on need >= line and kind != nothing; score it the same way, so "nothing" counts as a no.
+  const hintScore = (a: Record<string, any>) => (a.kind.choice === "nothing" ? 0 : a.need.noul);
   const report = {
     backend: jev.provider,
     url: jev.provider === "laya" ? process.env.LAYA_URL : undefined,
     at: new Date().toISOString(),
     research_need: noulReport(research, ra.map((a) => a.answers.need.noul), research.map((c) => c.need), RESEARCH_LINE),
     research_kind: { accuracy: r2(needed.filter(([c, k]) => c.kind === k).length / needed.length), cases: needed.length },
+    research_real: { ...noulReport(real, da.map((a) => hintScore(a.answers)), real.map((c) => c.need), RESEARCH_LINE), cases: real.length, yes: real.filter((c) => c.need).length },
     filter_relevant: noulReport(filter, fa.map((a) => a.answers.relevant.noul), filter.map((c) => c.relevant)),
     triage_kind: { accuracy: r2(triage.filter((c, i) => ta[i].answers.kind.choice === c.label).length / triage.length), cases: triage.length },
-    median_ms: Math.round(median([...ra, ...fa, ...ta].map((a) => a.ms))),
-    calls: ra.length + fa.length + ta.length,
+    median_ms: Math.round(median([...ra, ...da, ...fa, ...ta].map((a) => a.ms))),
+    calls: ra.length + da.length + fa.length + ta.length,
   };
   console.log(JSON.stringify(report, null, 1));
   if (o.name) {

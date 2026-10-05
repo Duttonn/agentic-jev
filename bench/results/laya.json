@@ -1,7 +1,7 @@
 {
  "backend": "laya",
  "url": "http://127.0.0.1:8765",
- "at": "2026-10-05T13:13:12.190Z",
+ "at": "2026-10-05T13:40:36.091Z",
  "research_need": {
   "auc": 0.78,
   "test_at_0_5": 0.58,
@@ -22,6 +22,24 @@
   "accuracy": 0.38,
   "cases": 24
  },
+ "research_real": {
+  "auc": 0.7,
+  "test_at_0_5": 0.78,
+  "test_at_code_line": 0.91,
+  "code_line": 0.7,
+  "dev_line": 0.563,
+  "test_at_dev_line": 0.78,
+  "yes_range": [
+   0,
+   0.84
+  ],
+  "no_range": [
+   0,
+   0.92
+  ],
+  "cases": 64,
+  "yes": 10
+ },
  "filter_relevant": {
   "auc": 0.95,
   "test_at_0_5": 0.56,
@@ -40,6 +58,6 @@
   "accuracy": 0.4,
   "cases": 20
  },
- "median_ms": 622,
- "calls": 108
+ "median_ms": 688,
+ "calls": 172
 }
