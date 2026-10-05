@@ -1,5 +1,5 @@
 /**
- * bin/jev end to end: ask with a command, no gate, files over a glob, stdin questions, bad input, compact, setup.
+ * bin/jev end to end: ask with a command, no gate, files over a glob, stdin questions, watch, bad input, compact, setup.
  * Offline on the mock by default. JEV_LIVE=1 runs the same calls against real Jev and checks the answers.
  */
 import { execFileSync } from "node:child_process";
@@ -55,6 +55,19 @@ test("output is one compact line by default, --full keeps types, probabilities a
   const a = json(["ask", "-q", KIND, "-s", "TypeError: cannot read properties of undefined"]).answers.kind;
   assert.deepEqual(Object.keys(a), ["choice", "confidence"]);
   assert.equal(a.confidence, Math.round(a.confidence * 100) / 100);
+});
+
+test("watch prints only when the answer changes, and --until stops on yes", () => {
+  const DONE = JSON.stringify({ done: { type: "noul", instructions: "Does `output` say the deploy finished?" } });
+  const marker = `${tmp}/deploy-${Date.now()}`;
+  const lines = run(["watch", "-q", DONE, "-c", `test -f ${marker} && echo deploy finished || echo deploy still running; touch ${marker}`, "--every", "0.2", "--until"])
+    .trim().split("\n").map((l) => JSON.parse(l));
+  assert.ok(lines.at(-1).answers.done.noul >= 0.5);
+  if (LIVE) assert.deepEqual(lines.map((l) => l.answers.done.noul >= 0.5), [false, true]);
+  let quiet = "";
+  try { execFileSync(BIN, ["watch", "-q", DONE, "-c", "echo deploy still running", "--every", "0.1", "--cwd", SANDBOX], { env, encoding: "utf8", timeout: 1500 }); } catch (e: any) { quiet = String(e.stdout); }
+  assert.equal(quiet.trim().split("\n").length, 1, "one line, however many polls");
+  assert.match(stderrOf(["watch", "-q", KIND, "-c", "true", "--until"]), /--until needs a noul/);
 });
 
 test("bad input fails with a message, not a call", () => {

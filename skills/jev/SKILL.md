@@ -16,6 +16,7 @@ not ask for the key in the conversation.
 
     jev ask -q '<json>' [-c '<command>'] [-p <path>]... [-s '<short note>'] [--cwd DIR]
     jev files -q '<json>' '<glob>'...           one call per file, in parallel, up to 255 files
+    jev watch -c '<command>' -q '<json>' [--every 30] [--until]   poll, print only when the answer changes
     jev compact --transcript <session.jsonl>    should this session compact now?
 
 `-q -` reads the questions from stdin. Use a quoted heredoc when they contain quotes:
@@ -53,6 +54,10 @@ Always give a choice an `other` option. Describe situations, not degrees.
   the user.
 - **Choosing what to read.** Run `jev files` over the glob with a relevance noul, then read only
   the hits. Do the same for many logs or transcripts.
+- **Waiting on something** (a deploy, CI, a job, a bot, a log). Do not loop on sleep and re-read
+  the status. Start `jev watch -c '<status command>' -q '<noul: does output show it finished or
+  failed?>' --until` in the background. Its output is one line per change, so you read nothing
+  until it moves.
 
 ## Limits
 

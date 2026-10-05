@@ -65,6 +65,10 @@ jev ask -c 'npm test' -q '{"kind":{"type":"choice","instructions":"What kind of 
 # which files matter, before opening any
 jev files 'src/**/*.ts' -q '{"relevant":{"type":"noul","instructions":"Does `content` compute invoice totals?"}}'
 
+# wait for a deploy without polling: one line per change, exits once it reads yes
+jev watch -c 'kubectl rollout status deploy/api --timeout=1s' --every 30 --until \
+  -q '{"done":{"type":"noul","instructions":"Does `output` show the rollout finished, successfully or not?"}}'
+
 # should this session compact now?
 jev compact --transcript ~/.claude/projects/<project>/<session>.jsonl
 ```
@@ -111,7 +115,7 @@ Code's `autoCompactWindow` setting, they sit at W/6, W/3 and 7W/12. Without a wi
 ## Test
 
 ```sh
-npm test                                  # 167 offline tests on the deterministic mock
+npm test                                  # the offline tests, on the deterministic mock
 JEV_LIVE=1 npm run test:live              # the CLI tests against real Jev, a fraction of a cent
 ```
 

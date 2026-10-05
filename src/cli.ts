@@ -3,6 +3,7 @@
  *
  *   jev ask     -q QUESTIONS [-s STATE] [-p PATH]... [-c COMMAND] [--cwd DIR]   one situation, one call
  *   jev files   -q QUESTIONS [-r] [--cwd DIR] PATH_OR_GLOB...                    the same questions of many files
+ *   jev watch   -c COMMAND -q QUESTIONS [--every SECONDS] [--until]              poll, print only when the answer changes
  *   jev compact --transcript FILE | --hook claude-code                          should this session compact now?
  *   jev setup                                                                    store the API key (handled by bin/jev)
  *   jev install                                                                  install from a clone or npx (handled by bin/jev)
@@ -28,6 +29,7 @@ const STATE_DIR = process.env.JEV_STATE_DIR || join(process.env.XDG_STATE_HOME |
 
 const USAGE = `jev ask     -q QUESTIONS [-s STATE] [-p PATH]... [-c COMMAND] [--cwd DIR]
 jev files   -q QUESTIONS [-r] [--cwd DIR] PATH_OR_GLOB...
+jev watch   -c COMMAND -q QUESTIONS [-s STATE] [-p PATH]... [--every SECONDS] [--until] [--cwd DIR]
 jev compact --transcript FILE | --hook claude-code
 jev setup
 jev install
@@ -38,6 +40,10 @@ ask:${ASK_JEV_DESCRIPTION.replace("For many files judged separately use ask_jev_
 
 files: the same questions of many files, one call per file in parallel. Globs and directories expand in code; node_modules,
 .git, binaries and oversize files are dropped; 255 max. Write questions against \`content\` (the file's text); \`path\` is in the state.
+
+watch: runs the command every --every seconds (default 30), asks the questions about \`output\`, and prints a line only
+when an answer changes: a noul crossing 0.5, another choice, another score level. The first answer always prints.
+--until stops once the first question, which must be a noul, reads yes. Run it in the background instead of polling.
 
 compact: reads a Claude Code transcript and says whether to compact now, with a ready /compact line. --hook claude-code reads
 a Stop hook payload on stdin and prints a systemMessage only when compacting is worth it.
@@ -59,6 +65,8 @@ const { values: o, positionals } = parseArgs({
     transcript: { type: "string" },
     hook: { type: "string" },
     full: { type: "boolean" },
+    every: { type: "string" },
+    until: { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -108,6 +116,30 @@ function runCommand(command: string, dir: string): Promise<CommandOutput> {
   });
 }
 
+/** What counts as a change: a noul's side of 0.5, a choice, a score's level. Confidence drift is not a change. */
+const verdictOf = (answers: Record<string, any>) =>
+  JSON.stringify(Object.values(answers).map((a) => (a.type === "noul" ? a.noul >= 0.5 : a.type === "choice" ? a.choice : a.legend)));
+
+/** Poll a command and print only the answers that changed, so a background watcher costs the agent nothing until it does. */
+async function watch() {
+  if (!o.command) throw new Error("watch needs -c COMMAND");
+  const questions = parseQuestions(o.questions === "-" ? readFileSync(0, "utf8") : o.questions!);
+  const first = Object.values(questions)[0] as any;
+  if (o.until && first.type !== "noul") throw new Error("--until needs a noul as the first question");
+  const every = Number(o.every ?? 30);
+  if (!(every > 0)) throw new Error("--every needs a number of seconds above 0");
+  let last = "";
+  for (;;) {
+    const { state } = await assembleState({ state: o.state, paths: o.path, command: o.command }, cwd, runCommand);
+    const { answers } = await decide("watch", state, questions);
+    const verdict = verdictOf(answers);
+    if (verdict !== last) print({ at: new Date().toISOString(), answers: o.full ? answers : slim(answers) });
+    last = verdict;
+    if (o.until && (Object.values(answers)[0] as any).noul >= 0.5) return;
+    await new Promise((r) => setTimeout(r, every * 1000));
+  }
+}
+
 async function compact() {
   const ask = async (s: unknown, q: any) => (await decide("compact", s, q)).answers as Record<string, any>;
   if (o.hook !== undefined) {
@@ -145,10 +177,12 @@ try {
     print(o.full
       ? { ...result, cost: summarize(ledger, 0) }
       : { results: Object.fromEntries(result.results.map((r) => [r.path, slim(r.answers)])), ...(result.skipped.length ? { skipped: result.skipped } : {}), calls: result.calls, cost: summarize(ledger, 0) });
+  } else if (mode === "watch") {
+    await watch();
   } else if (mode === "compact") {
     await compact();
   } else {
-    throw new Error(`unknown command "${mode}"; use ask, files, compact or setup`);
+    throw new Error(`unknown command "${mode}"; use ask, files, watch, compact or setup`);
   }
 } catch (err: any) {
   console.error(err instanceof AskStateError ? err.message : `jev ${mode}: ${err?.message ?? err}`);
