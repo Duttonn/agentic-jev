@@ -183,12 +183,53 @@ jev filter -s 'Laya open source decision model, how to run it locally' --top 4 <
 | Search filter log: what each search kept, with the scores | `~/.local/state/jev/filter.log` | `JEV_STATE_DIR` |
 | Research hook errors | `~/.local/state/jev/research.log` | `JEV_STATE_DIR` |
 | Preferred search tools named in the research hint | | `JEV_RESEARCH_TOOLS` |
+| Research hint line, default 0.7 (Jev); `npm run bench` gives another backend's | | `JEV_RESEARCH_LINE` |
 | Backend: `typesafe`, `openrouter`, `laya` or `mock` (offline, no key) | `~/.config/jev/env` | `JEV_BACKEND` |
 | Laya server URL, default `http://127.0.0.1:8765` | `~/.config/jev/env` | `LAYA_URL` |
 | Laya server key, when it has one | `~/.config/jev/env` | `LAYA_API_KEY` |
 | jev starts and stops Laya on this machine | `~/.config/jev/env` | `JEV_LAYA_LOCAL=1` |
 | Local Laya install | `~/.local/share/jev-laya` | `JEV_LAYA_HOME` |
 | Local Laya log | `~/.local/state/jev/laya/server.log` | `JEV_STATE_DIR` |
+
+## Bench
+
+`npm run bench` asks jev's fixed questions about 108 hand-labelled cases written for no one in
+particular. The cases cover three families:
+- the research check: 48 requests in English, French and German, half needing a lookup;
+- the search filter: 5 queries with 8 results each, with look-alike distractors;
+- failure triage: 20 command outputs.
+
+Each family is split in two: `dev` picks a backend's line, and `test` reports how that line holds on
+cases it never saw. The bench runs on whatever `JEV_BACKEND` selects, so the same command compares Jev,
+Laya, or any `/v1/systemone` server behind `LAYA_URL`. Results go to `bench/results/<name>.json`.
+
+| 2026-10-05 | Jev | decider-4b | Laya |
+| --- | --- | --- | --- |
+| Research: ranking (AUC) | 1.00 | 1.00 | 0.78 |
+| Research: test accuracy at 0.7 | 0.92 | 0.75 | 0.50 |
+| Research: line from dev, test accuracy | 0.385, 0.96 | 0.29, 0.96 | 0.415, 0.63 |
+| Research: what to look up | 0.96 | 0.83 | 0.38 |
+| Filter: AUC, test accuracy at 0.5 | 0.99, 0.94 | 1.00, 1.00 | 0.95, 0.56 |
+| Triage | 0.95 | 0.95 | 0.40 |
+
+decider-4b ranks as well as Jev but is less sure of itself: it needs its own line, which
+`JEV_RESEARCH_LINE=0.29` sets. Laya does not separate the research cases at any line.
+
+The real-use check below shows the limit of that line. On 80 prompts from one user's transcripts, Jev
+said 16 needed a lookup. decider-4b still ranked them well (AUC 0.88 against Jev), but at 0.29 it agreed
+with Jev on only 70%, below the 80% a constant "no" would get. The dev cases are shorter and cleaner
+than real requests, so the next cases to add are long, multi-part ones.
+
+`npm run bench -- --agree DIR` validates on real use instead. It takes typed requests from Claude Code
+transcripts under DIR, masks anything that looks like a key, and labels them with Jev, the teacher. It
+then reports how well the backend under test agrees. Nothing is tuned on these prompts, and none is
+printed.
+
+```sh
+JEV_BACKEND=typesafe npm run bench -- --name jev
+JEV_BACKEND=laya LAYA_URL=http://gpu-box:8000 BENCH_CONCURRENCY=1 npm run bench -- --name decider-4b
+JEV_BACKEND=laya LAYA_URL=http://gpu-box:8000 JEV_RESEARCH_LINE=0.29 npm run bench -- --agree ~/.claude/projects --n 80
+```
 
 ## Test
 

@@ -1,0 +1,48 @@
+{"id":"r01","split":"dev","task":"Migrate our Next.js app from the pages router to the app router","need":true,"kind":"library_docs"}
+{"id":"r02","split":"dev","task":"What is the current LTS version of Node.js, and should we upgrade the CI image?","need":true,"kind":"current_facts"}
+{"id":"r03","split":"dev","task":"cargo build fails with error[E0658]: use of unstable library feature 'let_chains' after updating the toolchain","need":true,"kind":"error_message"}
+{"id":"r04","split":"dev","task":"Read https://arxiv.org/abs/2310.06825 and tell me if the method applies to our retrieval pipeline","need":true,"kind":"link"}
+{"id":"r05","split":"dev","task":"Add OpenTelemetry tracing to the FastAPI service using the official instrumentation package","need":true,"kind":"library_docs"}
+{"id":"r06","split":"dev","task":"Compare the hourly price of an H100 on AWS, GCP and Lambda today","need":true,"kind":"current_facts"}
+{"id":"r07","split":"dev","task":"Configure Terraform's AWS provider v6 for the new S3 bucket resources","need":true,"kind":"library_docs"}
+{"id":"r08","split":"dev","task":"Pourquoi Xcode affiche 'Command PhaseScriptExecution failed with a nonzero exit code' sur le build Release ?","need":true,"kind":"error_message"}
+{"id":"r09","split":"dev","task":"Use the Mapbox GL JS v3 API to add 3D terrain to the map component","need":true,"kind":"library_docs"}
+{"id":"r10","split":"dev","task":"Is Python 3.14 supported by PyTorch yet? We want to bump our base image","need":true,"kind":"current_facts"}
+{"id":"r11","split":"dev","task":"Look at this issue https://github.com/vercel/next.js/issues/48748 and see if our bug is the same","need":true,"kind":"link"}
+{"id":"r12","split":"dev","task":"Wie konfiguriere ich die neue Gradle Version Catalog Syntax für unser Android-Projekt?","need":true,"kind":"library_docs"}
+{"id":"r13","split":"dev","task":"Rename the function getUserData to fetchUser everywhere in src/","need":false}
+{"id":"r14","split":"dev","task":"Add a unit test for the parseDate helper covering leap years","need":false}
+{"id":"r15","split":"dev","task":"The login form submits twice when you press Enter; fix it","need":false}
+{"id":"r16","split":"dev","task":"Split the 900-line utils.py into smaller modules by topic","need":false}
+{"id":"r17","split":"dev","task":"Write a docstring for every public function in billing.py","need":false}
+{"id":"r18","split":"dev","task":"Explique-moi ce que fait la fonction reduce dans ce fichier","need":false}
+{"id":"r19","split":"dev","task":"Change the button color on the settings page to match the header","need":false}
+{"id":"r20","split":"dev","task":"Our nightly job writes duplicate rows; add a unique constraint and dedupe the table","need":false}
+{"id":"r21","split":"dev","task":"Convert this callback-based code to async/await","need":false}
+{"id":"r22","split":"dev","task":"Add a --dry-run flag to our deploy script that prints the commands instead of running them","need":false}
+{"id":"r23","split":"dev","task":"Sort the imports and remove the unused ones in the components folder","need":false}
+{"id":"r24","split":"dev","task":"Mets un lien vers https://status.example.com dans le README","need":false}
+{"id":"r25","split":"test","task":"Set up Stripe Checkout with the latest API version for our subscription plans","need":true,"kind":"library_docs"}
+{"id":"r26","split":"test","task":"Which open-source vector database has the best recall at 10M vectors right now?","need":true,"kind":"current_facts"}
+{"id":"r27","split":"test","task":"docker compose up fails with 'failed to solve: failed to compute cache key: not found' on the build step","need":true,"kind":"error_message"}
+{"id":"r28","split":"test","task":"Summarize the changes in https://github.com/facebook/react/releases/tag/v19.0.0 that affect us","need":true,"kind":"link"}
+{"id":"r29","split":"test","task":"Use SwiftData's new #Index macro to speed up our queries","need":true,"kind":"library_docs"}
+{"id":"r30","split":"test","task":"What are the current rate limits of the GitHub REST API for authenticated apps?","need":true,"kind":"current_facts"}
+{"id":"r31","split":"test","task":"kubectl apply returns 'no matches for kind Ingress in version extensions/v1beta1'","need":true,"kind":"error_message"}
+{"id":"r32","split":"test","task":"Regarde cette vidéo https://www.youtube.com/watch?v=dQw4w9WgXcQ et résume les points techniques","need":true,"kind":"link"}
+{"id":"r33","split":"test","task":"Integrate Supabase Auth with magic links in our SvelteKit app","need":true,"kind":"library_docs"}
+{"id":"r34","split":"test","task":"Has the EU AI Act's obligation for general-purpose models started applying yet?","need":true,"kind":"current_facts"}
+{"id":"r35","split":"test","task":"npm install now prints ERESOLVE unable to resolve dependency tree with react@19 and @testing-library/react","need":true,"kind":"error_message"}
+{"id":"r36","split":"test","task":"Port our Webpack config to Vite 6, keeping the same aliases and env handling","need":true,"kind":"library_docs"}
+{"id":"r37","split":"test","task":"Move the constants at the top of main.go into a config struct","need":false}
+{"id":"r38","split":"test","task":"Fix the off-by-one error in the pagination loop","need":false}
+{"id":"r39","split":"test","task":"Add input validation to the signup handler: email format and password length","need":false}
+{"id":"r40","split":"test","task":"Renomme la classe Manager en SessionManager et mets à jour les imports","need":false}
+{"id":"r41","split":"test","task":"Write a Makefile with build, test and lint targets for this repo","need":false}
+{"id":"r42","split":"test","task":"Extract the duplicated retry logic in the three API clients into one helper","need":false}
+{"id":"r43","split":"test","task":"Translate the error messages in errors.ts to French","need":false}
+{"id":"r44","split":"test","task":"Why does this recursive function overflow the stack for n = 100000?","need":false}
+{"id":"r45","split":"test","task":"Add a loading spinner while the dashboard fetches data","need":false}
+{"id":"r46","split":"test","task":"Generate fixtures for the order tests: three users with two orders each","need":false}
+{"id":"r47","split":"test","task":"Make the CLI print its version with --version, read from package.json","need":false}
+{"id":"r48","split":"test","task":"Add the link https://docs.example.com/api to the help text of the CLI","need":false}
