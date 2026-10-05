@@ -69,8 +69,9 @@ jev files 'src/**/*.ts' -q '{"relevant":{"type":"noul","instructions":"Does `con
 jev compact --transcript ~/.claude/projects/<project>/<session>.jsonl
 ```
 
-`jev --help` prints the full question schema. Answers come back as JSON with `state_summary` (what was
-sent) and `cost`. Questions with quotes go through stdin: `-q -` with a quoted heredoc.
+`jev --help` prints the full question schema. Answers come back as one line of JSON, rounded to two
+decimals, with `state_summary` (what was sent) and `cost`. `jev files` keys its `results` by path.
+`--full` adds the type tags, every option's probability, usage and model: about five times the tokens. Questions with quotes go through stdin: `-q -` with a quoted heredoc.
 
 `-c` runs the command in your shell exactly as given, and jev puts no gate in front of it. What may run
 is up to the agent's own permission system, which already sees the full `jev ask -c '...'` command line.

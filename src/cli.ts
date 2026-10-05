@@ -32,8 +32,9 @@ jev compact --transcript FILE | --hook claude-code
 jev setup
 jev install
 QUESTIONS: JSON, or - to read it from stdin.
+Output: one line of JSON with two-decimal answers. --full adds the type tags, every option's probability, usage and model.
 
-ask: ${ASK_JEV_DESCRIPTION.replace("For many files judged separately use ask_jev_files instead.", "For many files judged separately use `jev files`.")}
+ask:${ASK_JEV_DESCRIPTION.replace("For many files judged separately use ask_jev_files instead.", "For many files judged separately use `jev files`.")}
 
 files: the same questions of many files, one call per file in parallel. Globs and directories expand in code; node_modules,
 .git, binaries and oversize files are dropped; 255 max. Write questions against \`content\` (the file's text); \`path\` is in the state.
@@ -57,6 +58,7 @@ const { values: o, positionals } = parseArgs({
     cwd: { type: "string" },
     transcript: { type: "string" },
     hook: { type: "string" },
+    full: { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -78,6 +80,23 @@ async function decide(tool: string, state: any, questions: any) {
   append("ledger.jsonl", `{"at":"${new Date().toISOString()}","tool":"${tool}","cwd":${JSON.stringify(cwd)},"questions":${JSON.stringify(Object.keys(questions))},"answers":${answers},"usage":${JSON.stringify(result.usage)}}`);
   return result;
 }
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/** What the agent reads, about a sixth of --full: no type tags, no per-option probabilities, two decimals. */
+function slim(answers: Record<string, any>) {
+  const out: Record<string, unknown> = {};
+  for (const [id, a] of Object.entries(answers)) {
+    out[id] = a.type === "noul" ? { noul: r2(a.noul) }
+      : a.type === "choice" ? { choice: a.choice, confidence: r2(a.confidence) }
+      : { score: r2(a.score), confidence: r2(a.confidence), legend: a.legend };
+  }
+  return out;
+}
+
+const print = (value: unknown) => console.log(o.full ? JSON.stringify(value, null, 1) : JSON.stringify(value));
+/** Drop empty fields from the summary of what was sent. */
+const compactSummary = (s: Record<string, any>) => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== null && !(Array.isArray(v) && !v.length)));
 
 /** Run a command for the state. The output is captured, never printed. */
 function runCommand(command: string, dir: string): Promise<CommandOutput> {
@@ -106,7 +125,8 @@ async function compact() {
     return;
   }
   if (!o.transcript) throw new Error("compact needs --transcript FILE or --hook claude-code");
-  console.log(JSON.stringify(await shouldCompact(resolve(cwd, o.transcript), "", ask), null, 1));
+  const v = await shouldCompact(resolve(cwd, o.transcript), "", ask);
+  print(o.full || !v.answers ? v : { ...v, answers: slim(v.answers) });
 }
 
 try {
@@ -115,12 +135,16 @@ try {
     // No gate on the command: jev runs as the calling agent's own shell, under that agent's permissions.
     const { state, summary } = await assembleState({ state: o.state, paths: o.path, command: o.command }, cwd, runCommand);
     const result = await decide("ask", state, questions);
-    console.log(JSON.stringify({ answers: result.answers, state_summary: summary, model: result.model, cost: summarize(ledger, 0) }, null, 1));
+    print(o.full
+      ? { answers: result.answers, state_summary: summary, model: result.model, usage: result.usage, cost: summarize(ledger, 0) }
+      : { answers: slim(result.answers), state_summary: compactSummary(summary), cost: summarize(ledger, 0) });
   } else if (mode === "files") {
     if (!targets.length) throw new Error("files needs at least one path or glob");
     const questionsJson = o.questions === "-" ? readFileSync(0, "utf8") : o.questions!;
     const result = await askFiles(targets, questionsJson, cwd, { recursive: o.recursive ?? false, decide: (s, q) => decide("files", s, q) });
-    console.log(JSON.stringify({ ...result, cost: summarize(ledger, 0) }, null, 1));
+    print(o.full
+      ? { ...result, cost: summarize(ledger, 0) }
+      : { results: Object.fromEntries(result.results.map((r) => [r.path, slim(r.answers)])), ...(result.skipped.length ? { skipped: result.skipped } : {}), calls: result.calls, cost: summarize(ledger, 0) });
   } else if (mode === "compact") {
     await compact();
   } else {
