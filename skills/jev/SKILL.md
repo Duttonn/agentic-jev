@@ -15,7 +15,7 @@ not ask for the key in the conversation.
 ## Commands
 
     jev ask -q '<json>' [-c '<command>'] [-p <path>]... [-s '<short note>'] [--cwd DIR]
-    jev files -q '<json>' '<glob>'...           one call per file, in parallel, up to 255 files
+    jev files -q '<json>' '<glob>'... [--top K] one call per file, in parallel, up to 255 files
     jev compact --transcript <session.jsonl>    should this session compact now?
 
 `-q -` reads the questions from stdin. Use a quoted heredoc when they contain quotes:
@@ -52,7 +52,8 @@ Always give a choice an `other` option. Describe situations, not degrees.
   user's words in `-s` and ask a choice over the readings. Below 0.7, state the reading and ask
   the user.
 - **Choosing what to read.** Run `jev files` over the glob with a relevance noul, then read only
-  the hits. Do the same for many logs or transcripts.
+  the hits. Do the same for many logs or transcripts. With many candidates, add `--top K` (5 is a
+  good start): every file is judged, only the K best come back, best first.
 
 ## Limits
 

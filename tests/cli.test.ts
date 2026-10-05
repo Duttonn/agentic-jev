@@ -46,6 +46,16 @@ test("files judges every file in parallel, questions from stdin", () => {
   if (LIVE) assert.ok(r.results["src/domain/billing.ts"].money.noul > 0.5 && r.results["src/auth/jwt.ts"].money.noul < 0.5, JSON.stringify(r.results));
 });
 
+test("files --top K judges every file and keeps the K best, best first", () => {
+  const r = json(["files", "-q", MONEY, "src/**/*.ts", "--top", "3"]);
+  const scores = Object.values(r.results).map((a: any) => a.money.noul);
+  assert.ok(r.calls >= 9 && scores.length === 3);
+  assert.deepEqual(scores, [...scores].sort((a, b) => b - a));
+  if (LIVE) assert.ok(scores.every((s) => s > 0.5) && !("src/auth/jwt.ts" in r.results), JSON.stringify(r.results));
+  assert.match(stderrOf(["files", "-q", KIND, "src/**/*.ts", "--top", "3"]), /must be a noul or a score/);
+  assert.match(stderrOf(["files", "-q", MONEY, "src/**/*.ts", "--top", "0"]), /whole number above 0/);
+});
+
 test("output is one compact line by default, --full keeps types, probabilities and usage", () => {
   const out = run(["files", "-q", KIND, "src/**/*.ts"]);
   const full = run(["files", "-q", KIND, "src/**/*.ts", "--full"]);

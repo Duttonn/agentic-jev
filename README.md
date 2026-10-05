@@ -62,8 +62,8 @@ After the install, paste `~/.local/share/jev/AGENTS.snippet.md` into the file th
 # classify a failure without reading the test output
 jev ask -c 'npm test' -q '{"kind":{"type":"choice","instructions":"What kind of failure is `output`?","criteria":{"bug_in_code":"The code under test is wrong","wrong_test":"The test expects the wrong thing","environment":"Missing deps, config, network","other":"Anything else"}}}'
 
-# which files matter, before opening any
-jev files 'src/**/*.ts' -q '{"relevant":{"type":"noul","instructions":"Does `content` compute invoice totals?"}}'
+# which files matter, before opening any; --top 5 keeps the five best, best first
+jev files 'src/**/*.ts' --top 5 -q '{"relevant":{"type":"noul","instructions":"Does `content` compute invoice totals?"}}'
 
 # should this session compact now?
 jev compact --transcript ~/.claude/projects/<project>/<session>.jsonl
