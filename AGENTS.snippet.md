@@ -17,6 +17,8 @@ entering your context. Reach for it unasked:
 - A value or target with two readings: a choice over the readings. Below 0.7, state it and ask.
 - Choosing what to read: `jev files` with a relevance noul, then read only the hits. `--top K`
   keeps only the K best when there are many.
+- Waiting on a deploy, CI, a job or a log: `jev watch -c '<status command>' -q '<noul>' --until`
+  in the background instead of a sleep-and-check loop. It prints only when the answer changes.
 
 Not for lookups, counts, math, or facts only the user holds. An answer is a judgment, not
 evidence.

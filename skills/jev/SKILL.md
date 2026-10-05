@@ -16,6 +16,7 @@ not ask for the key in the conversation.
 
     jev ask -q '<json>' [-c '<command>'] [-p <path>]... [-s '<short note>'] [--cwd DIR]
     jev files -q '<json>' '<glob>'... [--top K] one call per file, in parallel, up to 255 files
+    jev watch -c '<command>' -q '<json>' [--every 30] [--until]   poll, print only when the answer changes
     jev compact --transcript <session.jsonl>    should this session compact now?
     jev research -s '<the user request>'        does this task need a lookup before acting?
 
@@ -63,6 +64,10 @@ category that won. Each call stays short, which is where Jev is most accurate.
 - **Choosing what to read.** Run `jev files` over the glob with a relevance noul, then read only
   the hits. Do the same for many logs or transcripts. With many candidates, add `--top K` (5 is a
   good start): every file is judged, only the K best come back, best first.
+- **Waiting on something** (a deploy, CI, a job, a bot, a log). Do not loop on sleep and re-read
+  the status. Start `jev watch -c '<status command>' -q '<noul: does output show it finished or
+  failed?>' --until` in the background. Its output is one line per change, so you read nothing
+  until it moves.
 
 ## Limits
 

@@ -68,6 +68,10 @@ jev files 'src/**/*.ts' --top 5 -q '{"relevant":{"type":"noul","instructions":"D
 # does this task need a lookup before acting? prints a hint naming what to look up first, or null
 jev research -s 'Upgrade the project to the latest Expo SDK and fix whatever breaks'
 
+# wait for a deploy without polling: one line per change, exits once it reads yes
+jev watch -c 'kubectl rollout status deploy/api --timeout=1s' --every 30 --until \
+  -q '{"done":{"type":"noul","instructions":"Does `output` show the rollout finished, successfully or not?"}}'
+
 # should this session compact now?
 jev compact --transcript ~/.claude/projects/<project>/<session>.jsonl
 ```
@@ -129,7 +133,7 @@ is not null. It adds one Jev call per prompt, about 300 ms.
 ## Test
 
 ```sh
-npm test                                  # 167 offline tests on the deterministic mock
+npm test                                  # the offline tests, on the deterministic mock
 JEV_LIVE=1 npm run test:live              # the CLI tests against real Jev, a fraction of a cent
 ```
 
