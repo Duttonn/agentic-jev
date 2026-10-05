@@ -80,7 +80,14 @@ export function readSession(path: string) {
   return { prompts, summary, tools: [...new Set(tools)] };
 }
 
-const HEAD: Record<string, string> = { notice: "compacting is optional", recommend: "compacting recommended", request: "compact before continuing" };
+/**
+ * A go-ahead ("ok", "continue", "vas-y") or a pick from options the agent just offered ("do O2", "fais A1 et A3")
+ * continues the last turn, so compacting there would cut what it points to. Code decides, no call. Limit: 60 chars.
+ */
+const FOLLOW_UP = /^(ok|okay|oui|yes|yep|sure|go|go on|vas[- ]?y|continue|carry on|next|do it|fais|fait|lets go|let's go)\b|\b[A-Z]\d{1,2}\b/i;
+export const isFollowUp = (request: string) => request.trim().length <= 60 && FOLLOW_UP.test(request.trim());
+
+const HEAD: Record<string, string> ={ notice: "compacting is optional", recommend: "compacting recommended", request: "compact before continuing" };
 
 export async function shouldCompact(transcriptPath: string, lastAssistantMessage: string, ask: Ask): Promise<Verdict> {
   const tokens = contextTokens(transcriptPath);
@@ -90,6 +97,7 @@ export async function shouldCompact(transcriptPath: string, lastAssistantMessage
   if (tokens < lines.notice) return quiet("below the notice line"); // numbers in code first: no call below the line
   const { prompts, summary, tools } = readSession(transcriptPath);
   if (prompts.length < 2) return quiet("first request, nothing to move on from");
+  if (isFollowUp(prompts.at(-1)!)) return quiet("short follow-up to the last turn"); // "ok go O4" leans on what came before
 
   const usage = { tokens, pct: window ? (tokens / window) * 100 : 0 };
   const state = {

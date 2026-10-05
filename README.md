@@ -79,7 +79,9 @@ is up to the agent's own permission system, which already sees the full `jev ask
 
 `jev compact` reads a Claude Code transcript. It takes the context size from the last request
 (input + cache read + cache write tokens), so below the first line it asks nothing and costs nothing.
-Above that line, Jev answers four questions:
+A short follow-up of at most 60 characters ("ok", "continue", "do O2") is skipped the same way: it
+continues the last turn, so compacting there would cut what it points to. Otherwise, Jev answers four
+questions:
 - did the request switch tasks;
 - did the last turn finish a unit of work;
 - how much history does the next step need;

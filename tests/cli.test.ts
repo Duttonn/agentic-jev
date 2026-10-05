@@ -84,6 +84,15 @@ test("compact recommends compacting on a task switch, not mid task", () => {
   }
 });
 
+test("compact stays silent and makes no call on a short follow-up", async () => {
+  const { isFollowUp } = await import("../src/compact.ts");
+  for (const s of ["ok go O4", "continue", "fais O1 et O2", "vas-y", "yes, do A2"]) assert.ok(isFollowUp(s), s);
+  for (const s of ["stop les bots, relance les automatiquement a 12h", "Now write a README for the blackjack project", "continue, aussi pourquoi le retrait automatique ne s'est pas active a 23h ?"]) assert.ok(!isFollowUp(s), s);
+  const path = transcript("followup", ["Fix the failing proration test in src/domain/billing.ts so npm test passes.", "ok go O4"], 250_000);
+  const v = json(["compact", "--transcript", path]);
+  assert.deepEqual([v.tier, v.reason], ["silent", "short follow-up to the last turn"]);
+});
+
 test("setup stores the key with mode 600 and picks the provider from its prefix", () => {
   const config = `${tmp}/config/env`;
   const setup = (key: string) => execFileSync(BIN, ["setup"], { env: { ...env, JEV_CONFIG: config }, input: key + "\n", encoding: "utf8" });
