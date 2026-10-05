@@ -7,6 +7,7 @@
  *   jev compact --transcript FILE | --hook claude-code                          should this session compact now?
  *   jev research -s TASK | --hook claude-code                                    does this task need a lookup first?
  *   jev laya    status | start [--wait] | stop                                       the local Laya server
+ *   jev filter  -s QUERY [--top K] < RESULTS | --hook claude-code               keep the search results that answer the query
  *   jev setup                                                                    store the API key (handled by bin/jev)
  *   jev install                                                                  install from a clone or npx (handled by bin/jev)
  *
@@ -26,6 +27,7 @@ import {
 import { shouldCompact } from "./compact.ts";
 import { needsResearch } from "./research.ts";
 import { ensureLaya, isLocalLaya, status as layaStatus, stopLaya, supervise } from "./laya.ts";
+import { filterResults, KEEP } from "./filter.ts";
 
 const COMMAND_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_CHARS = 200_000;
@@ -37,6 +39,7 @@ jev watch   -c COMMAND -q QUESTIONS [-s STATE] [-p PATH]... [--every SECONDS] [-
 jev compact --transcript FILE | --hook claude-code
 jev research -s TASK | --hook claude-code
 jev laya    status | start [--wait] | stop
+jev filter  -s QUERY [--top K] < RESULTS | --hook claude-code
 jev setup
 jev install
 QUESTIONS: JSON, or - to read it from stdin.
@@ -62,6 +65,10 @@ payload and adds the hint to the model's context only on a yes. JEV_RESEARCH_TOO
 laya: with Laya on this machine (jev setup, option 2), every call starts laya-serve if it is down and registers the
 agent it runs under; the server stops a minute after the last agent exits. start registers the caller and starts it
 (--wait until it answers; --hook claude-code for a silent SessionStart hook), stop stops it now, status shows the URL, the server and the agents keeping it up.
+
+filter: search results on stdin, in Exa's format (blocks opening with "Title: ", joined by a "---" line). Jev scores each
+against the query in parallel; the best --top K (default 5) stay whole, the others shrink to title and URL. Other text
+passes through. --hook claude-code reads a PostToolUse payload of an MCP search tool and replaces what the model sees.
 
 setup: choose the backend: a Jev key (TypeSafe apikey_... or OpenRouter sk-or-...), Laya on this machine (installs it),
 or Laya on another machine (its URL). Stored in ~/.config/jev/env, mode 600.
@@ -89,7 +96,7 @@ const { values: o, positionals } = parseArgs({
   },
 });
 const [mode, ...targets] = positionals;
-if (o.help || !mode || (!["compact", "research", "laya"].includes(mode) && !o.questions)) { console.log(USAGE); process.exit(o.help ? 0 : 2); }
+if (o.help || !mode || (!["compact", "research", "laya", "filter"].includes(mode) && !o.questions)) { console.log(USAGE); process.exit(o.help ? 0 : 2); }
 
 const cwd = resolve(o.cwd ?? process.cwd());
 let ledger = emptyLedger();
@@ -186,6 +193,37 @@ async function compact() {
   print(o.full || !v.answers ? v : { ...v, answers: slim(v.answers) });
 }
 
+async function filter() {
+  const ask = async (s: unknown, q: any) => (await decide("filter", s, q)).answers as Record<string, any>;
+  const keep = o.top === undefined ? KEEP : Number(o.top);
+  if (!(Number.isInteger(keep) && keep > 0)) throw new Error("--top needs a whole number above 0");
+  if (o.hook !== undefined) {
+    layaWaitMs = 8_000;
+    // Same rule as the other hooks: on any failure the model sees the tool's own output, untouched.
+    try {
+      if (o.hook !== "claude-code") throw new Error(`unknown hook "${o.hook}"; supported: claude-code`);
+      const input = JSON.parse(readFileSync(0, "utf8"));
+      const query = String(input.tool_input?.query ?? "");
+      if (!query || !Array.isArray(input.tool_response)) return;
+      let changed = false;
+      const output = await Promise.all(input.tool_response.map(async (item: any) => {
+        const v = item?.type === "text" ? await filterResults(query, item.text, ask, keep) : null;
+        if (!v) return item;
+        changed = true;
+        append("filter.log", `${new Date().toISOString()} ${input.tool_name} kept ${v.kept}/${v.total}: ${v.scores.map((x) => x.toFixed(2)).join(" ")}`);
+        return { ...item, text: v.text };
+      }));
+      if (changed) console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: "PostToolUse", updatedToolOutput: output } }));
+    } catch (err: any) {
+      append("filter.log", `${new Date().toISOString()} error: ${err?.message ?? err}`);
+    }
+    return;
+  }
+  if (!o.state) throw new Error("filter needs -s QUERY with the results on stdin, or --hook claude-code");
+  const text = readFileSync(0, "utf8");
+  console.log((await filterResults(o.state, text, ask, keep))?.text ?? text);
+}
+
 async function research() {
   const ask = async (s: unknown, q: any) => (await decide("research", s, q)).answers as Record<string, any>;
   if (o.hook !== undefined) {
@@ -245,8 +283,10 @@ try {
     else if (action === "stop") print({ stopped: stopLaya(STATE_DIR) });
     else if (action === "status") print(await layaStatus(STATE_DIR));
     else throw new Error(`unknown laya action "${action}"; use status, start or stop`);
+  } else if (mode === "filter") {
+    await filter();
   } else {
-    throw new Error(`unknown command "${mode}"; use ask, files, watch, compact, research, laya or setup`);
+    throw new Error(`unknown command "${mode}"; use ask, files, watch, compact, research, laya, filter or setup`);
   }
 } catch (err: any) {
   console.error(err instanceof AskStateError ? err.message : `jev ${mode}: ${err?.message ?? err}`);

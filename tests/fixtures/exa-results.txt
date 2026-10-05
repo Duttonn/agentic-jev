@@ -1,0 +1,69 @@
+Title: Laya: an open source alternative to TypeSafe Jev
+URL: https://imasters.com/laya
+Published: 2026-09-20
+Author: N/A
+Highlights:
+Laya is a 421M ModernBERT-large decision model that answers choice, score and yes/no questions in one forward pass. Apache 2.0, runs locally.
+
+---
+
+Title: Best pizza in Naples 2026
+URL: https://food.example/naples-pizza
+Published: 2026-05-01
+Author: N/A
+Highlights:
+Our guide to the ten best pizzerias in Naples, from classic margherita to fried pizza.
+
+---
+
+Title: NandhaKishorM/laya on GitHub
+URL: https://github.com/NandhaKishorM/laya
+Published: 2026-10-01
+Author: N/A
+Highlights:
+laya-serve exposes POST /v1/systemone, the same wire protocol as Jev. pip install laya[serve]. LAYA_DEVICE, LAYA_PORT.
+
+---
+
+Title: Laya Beach Resort, Goa
+URL: https://travel.example/laya-resort
+Published: 2025-12-11
+Author: N/A
+Highlights:
+Laya Beach Resort offers sea-view rooms, a spa and two pools on Goa's south coast.
+
+---
+
+Title: Jev vs Laya: hosted vs local decisions
+URL: https://jevmodel.org/jev-vs-laya/
+Published: 2026-09-25
+Author: N/A
+Highlights:
+Jev is a managed API; Laya is open weights you can run on your hardware. Laya claims 32.8 ms latency against 236 to 276 ms for Jev.
+
+---
+
+Title: How to tune a guitar
+URL: https://music.example/tune
+Published: 2024-03-03
+Author: N/A
+Highlights:
+Use a tuner or tune by ear, string by string, starting from the low E.
+
+---
+
+Title: New in llama.cpp: decision models
+URL: https://huggingface.co/blog/ggml-org/decision-models-in-llamacpp
+Published: 2026-10-02
+Author: N/A
+Highlights:
+llama-server now supports /v1/systemone for decision models including Laya, Kev-4B and OpenJev.
+
+---
+
+Title: Stock market today
+URL: https://news.example/markets
+Published: 2026-10-04
+Author: N/A
+Highlights:
+Stocks closed higher on Friday as tech shares rallied.

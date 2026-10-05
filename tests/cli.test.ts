@@ -144,6 +144,25 @@ test("research says when a task needs a lookup first, and its hook only speaks o
   }
 });
 
+test("filter keeps the search results that answer the query and replaces what the model sees", () => {
+  const results = readFileSync(fileURLToPath(new URL("./fixtures/exa-results.txt", import.meta.url)), "utf8");
+  const query = "Laya open source decision model, how to run it locally";
+  const hook = (payload: object) => run(["filter", "--hook", "claude-code"], JSON.stringify({ hook_event_name: "PostToolUse", ...payload })).trim();
+  const out = hook({ tool_name: "mcp__plugin_exa_exa__web_search_exa", tool_input: { query }, tool_response: [{ type: "text", text: results }] });
+  const [item] = JSON.parse(out).hookSpecificOutput.updatedToolOutput;
+  assert.equal(item.type, "text");
+  const [kept, list] = [item.text.split("\n\n---\n\njev kept")[0], item.text.split("\n").filter((l: string) => l.startsWith("- "))];
+  const keptTitles = kept.split("\n").filter((l: string) => l.startsWith("Title: "));
+  assert.ok(keptTitles.length >= 1 && keptTitles.length <= 5 && keptTitles.length + list.length === 8, item.text);
+  if (LIVE) {
+    for (const off of ["pizza", "Resort", "guitar", "Stock market"]) assert.ok(!kept.includes(off), `${off} was kept`);
+    assert.ok(kept.includes("NandhaKishorM/laya on GitHub"));
+  }
+  assert.equal(hook({ tool_name: "WebSearch", tool_input: { query }, tool_response: { query, results: [] } }), "", "built-in WebSearch passes through");
+  assert.equal(hook({ tool_name: "mcp__x__web_search", tool_input: { query }, tool_response: [{ type: "text", text: "no results" }] }), "");
+  assert.equal(run(["filter", "-s", query], results.split("\n\n---\n\n").slice(0, 3).join("\n\n---\n\n")).trim().split("Title: ").length - 1, 3, "three results: nothing to cut");
+});
+
 test("setup stores a key with mode 600, picks the provider from its prefix, and keeps the other settings", () => {
   const config = `${tmp}/config/env`;
   const setup = (input: string) => execFileSync(BIN, ["setup"], { env: { ...env, JEV_CONFIG: config }, input, encoding: "utf8" });
