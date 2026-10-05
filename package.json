@@ -5,11 +5,23 @@
   "type": "module",
   "private": true,
   "license": "MIT",
-  "bin": { "jev": "bin/jev" },
-  "files": ["bin", "src", "skills", "AGENTS.snippet.md", "LICENSE", "README.md"],
-  "engines": { "node": ">=22.18" },
+  "bin": {
+    "jev": "bin/jev"
+  },
+  "files": [
+    "bin",
+    "src",
+    "skills",
+    "AGENTS.snippet.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "test": "node --test \"tests/*.test.ts\"",
-    "test:live": "JEV_LIVE=1 node --test tests/cli.test.ts"
+    "test:live": "JEV_LIVE=1 node --test tests/cli.test.ts",
+    "bench": "node bench/run.ts"
   }
 }

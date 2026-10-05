@@ -1,0 +1,45 @@
+{
+ "backend": "laya",
+ "url": "http://127.0.0.1:8791",
+ "at": "2026-10-05T13:18:32.257Z",
+ "research_need": {
+  "auc": 1,
+  "test_at_0_5": 0.88,
+  "test_at_code_line": 0.75,
+  "code_line": 0.7,
+  "dev_line": 0.29,
+  "test_at_dev_line": 0.96,
+  "yes_range": [
+   0.25,
+   0.91
+  ],
+  "no_range": [
+   0.04,
+   0.28
+  ]
+ },
+ "research_kind": {
+  "accuracy": 0.83,
+  "cases": 24
+ },
+ "filter_relevant": {
+  "auc": 1,
+  "test_at_0_5": 1,
+  "dev_line": 0.279,
+  "test_at_dev_line": 1,
+  "yes_range": [
+   0.28,
+   0.94
+  ],
+  "no_range": [
+   0.01,
+   0.46
+  ]
+ },
+ "triage_kind": {
+  "accuracy": 0.95,
+  "cases": 20
+ },
+ "median_ms": 5430,
+ "calls": 108
+}

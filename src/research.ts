@@ -30,8 +30,9 @@ export const RESEARCH_QUESTIONS = {
   },
 } as const;
 
-/** At or above this, the hint is given. */
-export const RESEARCH_LINE = 0.7;
+/** At or above this, the hint is given. 0.7 fits Jev; `npm run bench` gives the line for another backend. */
+export const DEFAULT_RESEARCH_LINE = 0.7;
+export const RESEARCH_LINE = Number(process.env.JEV_RESEARCH_LINE) || DEFAULT_RESEARCH_LINE;
 // ponytail: a long paste is cut to its start, where the request usually is; split the prompt if that misses.
 const MAX_TASK_CHARS = 6000;
 
