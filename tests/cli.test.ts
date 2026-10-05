@@ -2,7 +2,7 @@
  * bin/jev end to end: ask with a command, no gate, files over a glob, stdin questions, watch, bad input, compact, setup.
  * Offline on the mock by default. JEV_LIVE=1 runs the same calls against real Jev and checks the answers.
  */
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -11,6 +11,7 @@ import test from "node:test";
 
 const BIN = fileURLToPath(new URL("../bin/jev", import.meta.url));
 const SANDBOX = fileURLToPath(new URL("./fixtures/sandbox/", import.meta.url));
+const FAKE_LAYA = fileURLToPath(new URL("./fixtures/fake-laya-serve.mjs", import.meta.url));
 const LIVE = process.env.JEV_LIVE === "1";
 const tmp = mkdtempSync(`${tmpdir()}/jev-test-`);
 const env: NodeJS.ProcessEnv = { ...process.env, JEV_STATE_DIR: `${tmp}/state`, JEV_COMPACT_WINDOW: "600000", ...(LIVE ? {} : { JEV_BACKEND: "mock" }) };
@@ -143,14 +144,56 @@ test("research says when a task needs a lookup first, and its hook only speaks o
   }
 });
 
-test("setup stores the key with mode 600 and picks the provider from its prefix", () => {
+test("setup stores a key with mode 600, picks the provider from its prefix, and keeps the other settings", () => {
   const config = `${tmp}/config/env`;
-  const setup = (key: string) => execFileSync(BIN, ["setup"], { env: { ...env, JEV_CONFIG: config }, input: key + "\n", encoding: "utf8" });
-  setup("apikey_test");
-  assert.equal(readFileSync(config, "utf8"), "TYPESAFE_API_KEY=apikey_test\n");
+  const setup = (input: string) => execFileSync(BIN, ["setup"], { env: { ...env, JEV_CONFIG: config }, input, encoding: "utf8" });
+  setup("apikey_test\n");
+  assert.equal(readFileSync(config, "utf8"), "TYPESAFE_API_KEY=apikey_test\nJEV_BACKEND=typesafe\n");
   assert.equal(statSync(config).mode & 0o777, 0o600);
-  setup("sk-or-test");
-  assert.equal(readFileSync(config, "utf8"), "OPENROUTER_API_KEY=sk-or-test\n");
+  setup("1\nsk-or-test\n");
+  assert.equal(readFileSync(config, "utf8"), "TYPESAFE_API_KEY=apikey_test\nOPENROUTER_API_KEY=sk-or-test\nJEV_BACKEND=openrouter\n");
+  assert.match(String((() => { try { setup("9\n"); } catch (e: any) { return e.stderr; } })()), /unknown choice/);
+});
+
+const fakeLaya = (port: number, extra: NodeJS.ProcessEnv = {}) => {
+  const child = spawn(process.execPath, [FAKE_LAYA], { env: { ...process.env, LAYA_PORT: String(port), ...extra }, stdio: "ignore" });
+  return { stop: () => child.kill() };
+};
+const waitFor = async (check: () => boolean, ms = 8000) => {
+  for (const end = Date.now() + ms; Date.now() < end; await new Promise((r) => setTimeout(r, 100))) if (check()) return true;
+  return false;
+};
+const port = () => 20000 + Math.floor(Math.random() * 20000);
+
+test("laya backend speaks the Jev wire, asks for the full 8192-token window, and sends a key only when set", async () => {
+  const p = port();
+  const server = fakeLaya(p, { LAYA_API_KEY: "team-key" });
+  const lenv = { ...env, JEV_BACKEND: "laya", LAYA_URL: `http://127.0.0.1:${p}` };
+  const ask = (e: NodeJS.ProcessEnv, extra: string[] = []) => execFileSync(BIN, ["ask", "-s", "hello", "-q", MONEY, "--cwd", SANDBOX, ...extra], { env: e, encoding: "utf8" });
+  try {
+    await waitFor(() => { try { ask({ ...lenv, LAYA_API_KEY: "team-key" }); return true; } catch { return false; } });
+    const full = JSON.parse(ask({ ...lenv, LAYA_API_KEY: "team-key" }, ["--full"]));
+    assert.equal(full.answers.money.noul, 0.9);
+    assert.equal(full.usage.max_len_seen, 8192);
+    assert.match(full.cost, /\$0\.000000/);
+    assert.throws(() => ask(lenv), /laya HTTP 401/);
+  } finally { server.stop(); }
+  assert.throws(() => ask(lenv), /Laya is not reachable at http:\/\/127\.0\.0\.1/);
+});
+
+test("local laya starts on an agent's first call and stops once no agent is left", async () => {
+  const p = port();
+  const state = `${tmp}/laya-life`;
+  const lenv = { ...env, JEV_BACKEND: "laya", JEV_LAYA_LOCAL: "1", JEV_LAYA_SERVE: FAKE_LAYA, LAYA_URL: `http://127.0.0.1:${p}`, JEV_STATE_DIR: state, JEV_LAYA_LINGER_MS: "500", JEV_LAYA_CHECK_MS: "200" };
+  const status = () => JSON.parse(execFileSync(BIN, ["laya", "status"], { env: lenv, encoding: "utf8" }));
+  assert.equal(execFileSync(BIN, ["laya", "start", "--hook", "claude-code"], { env: { ...lenv, JEV_LAYA_LOCAL: "0" }, encoding: "utf8" }), "", "silent, and nothing starts for other backends");
+  assert.equal(status().supervisor, null);
+  // A short-lived agent: this node process runs jev, then exits.
+  const agent = `require("child_process").execFileSync(${JSON.stringify(BIN)}, ["ask", "-s", "hello", "-q", ${JSON.stringify(MONEY)}], { stdio: "inherit" })`;
+  const out = execFileSync(process.execPath, ["-e", agent], { env: lenv, encoding: "utf8" });
+  assert.equal(JSON.parse(out).answers.money.noul, 0.9, "the first call waited for the server");
+  assert.ok(await waitFor(() => status().supervisor === null), "stopped after the agent exited");
+  assert.equal(status().healthy, false);
 });
 
 test("install copies jev to a stable home, links the cli and the skill, and survives no key", () => {

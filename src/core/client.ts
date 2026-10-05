@@ -13,21 +13,29 @@ import {
   type SystemOneResponse,
 } from "./types.ts";
 
-export type JevProvider = "mock" | "openrouter" | "typesafe";
+export type JevProvider = "mock" | "openrouter" | "typesafe" | "laya";
 
 const ENDPOINTS = {
   openrouter: "https://openrouter.ai/api/alpha/decisions",
   typesafe: "https://api.typesafe.ai/v1/systemone",
 } as const;
 
+/** Laya (open weights, Jev wire protocol) runs wherever laya-serve does: LAYA_URL, default this machine. */
+export const LAYA_DEFAULT_URL = "http://127.0.0.1:8765";
+export const layaUrl = () => (process.env.LAYA_URL?.trim() || LAYA_DEFAULT_URL).replace(/\/+$/, "");
+/** Laya reads 512 tokens unless told otherwise, and drops the rest of the state. 8192 is its ceiling. */
+export const LAYA_MAX_LEN = 8192;
+
 const DEFAULT_MODELS = {
   openrouter: "~typesafe/jev-latest",
   typesafe: "jev-latest",
+  laya: "jev-1", // laya-serve routes this to its English or multilingual checkpoint by the state's language
 } as const;
 
 const KEY_ENV = {
   openrouter: "OPENROUTER_API_KEY",
   typesafe: "TYPESAFE_API_KEY",
+  laya: "LAYA_API_KEY", // optional: only a laya-serve started with LAYA_API_KEY asks for it
 } as const;
 
 const RETRY_STATUSES = new Set([429, 502, 503, 529]);
@@ -129,8 +137,8 @@ export class JevClient {
     }
     if (this.provider === "mock") return;
     this.apiKey = (opts.apiKey ?? process.env[KEY_ENV[this.provider]])?.trim();
-    this.endpoint = opts.baseUrl ?? ENDPOINTS[this.provider];
-    if (!this.apiKey) {
+    this.endpoint = opts.baseUrl ?? (this.provider === "laya" ? `${layaUrl()}/v1/systemone` : ENDPOINTS[this.provider]);
+    if (!this.apiKey && this.provider !== "laya") {
       throw new Error(`Provider "${this.provider}" needs a nonblank apiKey or ${KEY_ENV[this.provider]}.`);
     }
   }
@@ -170,6 +178,7 @@ export class JevClient {
     const request: SystemOneRequest = JSON.parse(requestText);
     // Validate the actual wire snapshot too (e.g. user-defined toJSON methods).
     validateRequest(request);
+    if (this.provider === "laya") requestText = JSON.stringify({ ...request, max_len: LAYA_MAX_LEN });
     this.calls++;
     const started = performance.now();
     this.emit({ kind: "request", provider: this.provider, model: requestedModel, state, questions });
@@ -193,7 +202,7 @@ export class JevClient {
         signal.throwIfAborted();
         const res = await fetch(this.endpoint!, {
           method: "POST",
-          headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
+          headers: { ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}), "Content-Type": "application/json" },
           body: requestText,
           signal,
           redirect: "error",
@@ -239,16 +248,17 @@ function selectProvider(explicit?: JevProvider): JevProvider {
   const isolated = process.env.NODE_TEST_CONTEXT && process.env.JEV_LIVE !== "1";
   const selected = explicit ?? (isolated ? "mock" : process.env.JEV_BACKEND?.trim() || undefined);
   if (selected !== undefined) {
-    if (selected === "mock" || selected === "typesafe" || selected === "openrouter") return selected;
-    throw new Error(`Unknown JEV backend "${selected}"; use mock, openrouter, or typesafe.`);
+    if (selected === "mock" || selected === "typesafe" || selected === "openrouter" || selected === "laya") return selected;
+    throw new Error(`Unknown JEV backend "${selected}"; use mock, openrouter, typesafe or laya.`);
   }
   if (process.env.TYPESAFE_API_KEY?.trim()) return "typesafe";
   if (process.env.OPENROUTER_API_KEY?.trim()) return "openrouter";
-  throw new Error("No Jev credentials: set TYPESAFE_API_KEY or OPENROUTER_API_KEY, or explicitly select provider: mock / JEV_BACKEND=mock for offline use.");
+  throw new Error("No Jev credentials: run `jev setup` to choose a Jev key or Laya, or set TYPESAFE_API_KEY, OPENROUTER_API_KEY or JEV_BACKEND=laya (JEV_BACKEND=mock for offline use).");
 }
 
 function resultCost(response: SystemOneResponse, provider: JevProvider, pricing?: JevPricing): JevCost {
   if (provider === "mock") return { amount: 0, source: "mock" };
+  if (provider === "laya") return { amount: 0, source: "estimated" }; // open weights: no per-call price
   if (isNonnegative(response.usage.cost)) return { amount: response.usage.cost, source: "reported" };
   if (pricing) {
     const amount = response.usage.input_tokens / 1_000_000 * pricing.inputPerMillion +

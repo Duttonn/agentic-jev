@@ -9,8 +9,8 @@ description: Fast typed judgments through the `jev` CLI - a yes/no probability, 
 It reads files and runs commands itself, so their content never enters your context.
 Each call costs about 300 ms and a fraction of a cent.
 
-If a call fails with "No Jev credentials", tell the user to run `jev setup` in a terminal. Do
-not ask for the key in the conversation.
+If a call fails with "No Jev credentials" or "Laya is not reachable", tell the user to run `jev setup`
+in a terminal. Do not ask for the key in the conversation.
 
 ## Commands
 
