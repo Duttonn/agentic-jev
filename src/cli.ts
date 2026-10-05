@@ -2,7 +2,7 @@
  * jev: typed decisions for coding agents, from any shell. Levels 7, 8, 9 and 10 of disler/ten-levels-of-jev as one CLI.
  *
  *   jev ask     -q QUESTIONS [-s STATE] [-p PATH]... [-c COMMAND] [--cwd DIR]   one situation, one call
- *   jev files   -q QUESTIONS [-r] [--cwd DIR] PATH_OR_GLOB...                    the same questions of many files
+ *   jev files   -q QUESTIONS [-r] [--top K] [--cwd DIR] PATH_OR_GLOB...          the same questions of many files
  *   jev compact --transcript FILE | --hook claude-code                          should this session compact now?
  *   jev setup                                                                    store the API key (handled by bin/jev)
  *   jev install                                                                  install from a clone or npx (handled by bin/jev)
@@ -27,7 +27,7 @@ const MAX_OUTPUT_CHARS = 200_000;
 const STATE_DIR = process.env.JEV_STATE_DIR || join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "jev");
 
 const USAGE = `jev ask     -q QUESTIONS [-s STATE] [-p PATH]... [-c COMMAND] [--cwd DIR]
-jev files   -q QUESTIONS [-r] [--cwd DIR] PATH_OR_GLOB...
+jev files   -q QUESTIONS [-r] [--top K] [--cwd DIR] PATH_OR_GLOB...
 jev compact --transcript FILE | --hook claude-code
 jev setup
 jev install
@@ -36,7 +36,8 @@ Output: one line of JSON with two-decimal answers. --full adds the type tags, ev
 
 ask:${ASK_JEV_DESCRIPTION.replace("For many files judged separately use ask_jev_files instead.", "For many files judged separately use `jev files`.")}
 
-files: the same questions of many files, one call per file in parallel. Globs and directories expand in code; node_modules,
+files: the same questions of many files, one call per file in parallel. --top K keeps only the K files that rank highest on
+the first question (a noul or a score), best first. Globs and directories expand in code; node_modules,
 .git, binaries and oversize files are dropped; 255 max. Write questions against \`content\` (the file's text); \`path\` is in the state.
 
 compact: reads a Claude Code transcript and says whether to compact now, with a ready /compact line. --hook claude-code reads
@@ -59,6 +60,7 @@ const { values: o, positionals } = parseArgs({
     transcript: { type: "string" },
     hook: { type: "string" },
     full: { type: "boolean" },
+    top: { type: "string" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -141,10 +143,17 @@ try {
   } else if (mode === "files") {
     if (!targets.length) throw new Error("files needs at least one path or glob");
     const questionsJson = o.questions === "-" ? readFileSync(0, "utf8") : o.questions!;
+    const top = o.top === undefined ? 0 : Number(o.top);
+    const [rankBy, first] = Object.entries(parseQuestions(questionsJson))[0] as [string, any];
+    if (o.top !== undefined && !(Number.isInteger(top) && top > 0)) throw new Error("--top needs a whole number above 0");
+    if (top && first.type === "choice") throw new Error("--top ranks by the first question, which must be a noul or a score");
     const result = await askFiles(targets, questionsJson, cwd, { recursive: o.recursive ?? false, decide: (s, q) => decide("files", s, q) });
+    // Re-ranking: every file is judged, only the best K reach the agent.
+    const rank = (r: any) => (r.answers[rankBy].type === "noul" ? r.answers[rankBy].noul : r.answers[rankBy].score);
+    const results = top ? [...result.results].sort((a, b) => rank(b) - rank(a)).slice(0, top) : result.results;
     print(o.full
-      ? { ...result, cost: summarize(ledger, 0) }
-      : { results: Object.fromEntries(result.results.map((r) => [r.path, slim(r.answers)])), ...(result.skipped.length ? { skipped: result.skipped } : {}), calls: result.calls, cost: summarize(ledger, 0) });
+      ? { ...result, results, cost: summarize(ledger, 0) }
+      : { results: Object.fromEntries(results.map((r) => [r.path, slim(r.answers)])), ...(result.skipped.length ? { skipped: result.skipped } : {}), calls: result.calls, cost: summarize(ledger, 0) });
   } else if (mode === "compact") {
     await compact();
   } else {

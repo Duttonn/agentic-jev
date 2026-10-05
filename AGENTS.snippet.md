@@ -12,7 +12,8 @@ entering your context. Reach for it unasked:
 - Before a commit or push: `-c 'git diff --staged'` with the user's "leave X alone" constraints in
   `-s`: did the diff touch them, and how far beyond the request does it go?
 - A value or target with two readings: a choice over the readings. Below 0.7, state it and ask.
-- Choosing what to read: `jev files` with a relevance noul, then read only the hits.
+- Choosing what to read: `jev files` with a relevance noul, then read only the hits. `--top K`
+  keeps only the K best when there are many.
 
 Not for lookups, counts, math, or facts only the user holds. An answer is a judgment, not
 evidence.
