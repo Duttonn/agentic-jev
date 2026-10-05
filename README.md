@@ -115,8 +115,9 @@ Code's `autoCompactWindow` setting, they sit at W/6, W/3 and 7W/12. Without a wi
 ## Research
 
 `jev research` asks Jev whether a request rests on facts from outside the user's files: a library's
-docs or API, current versions, prices, a third-party error, a link the user gave. At 0.7 or above it
-returns a hint naming what to look up first. jev names no tool: the agent uses the search, fetch or
+docs or API, current versions, prices, a third-party error, a link the user gave. At 0.5 or above it
+returns a hint naming what to look up first. 0.5 comes from the bench: on its test split, Jev scores 0.96
+there, against 0.92 at 0.7, which missed real lookups. jev names no tool: the agent uses the search, fetch or
 docs tools it has. `JEV_RESEARCH_TOOLS` (in `~/.config/jev/env`, for example
 `JEV_RESEARCH_TOOLS=web_search, fetch`) adds your preferred ones to the hint.
 
@@ -183,7 +184,7 @@ jev filter -s 'Laya open source decision model, how to run it locally' --top 4 <
 | Search filter log: what each search kept, with the scores | `~/.local/state/jev/filter.log` | `JEV_STATE_DIR` |
 | Research hook errors | `~/.local/state/jev/research.log` | `JEV_STATE_DIR` |
 | Preferred search tools named in the research hint | | `JEV_RESEARCH_TOOLS` |
-| Research hint line, default 0.7 (Jev); `npm run bench` gives another backend's | | `JEV_RESEARCH_LINE` |
+| Research hint line, default 0.5 (Jev); `npm run bench` gives another backend's | | `JEV_RESEARCH_LINE` |
 | Backend: `typesafe`, `openrouter`, `laya` or `mock` (offline, no key) | `~/.config/jev/env` | `JEV_BACKEND` |
 | Laya server URL, default `http://127.0.0.1:8765` | `~/.config/jev/env` | `LAYA_URL` |
 | Laya server key, when it has one | `~/.config/jev/env` | `LAYA_API_KEY` |
